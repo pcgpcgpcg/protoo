@@ -22,4 +22,6 @@ source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_SOURCES})
 
 add_executable(testlws ${ALL_SOURCES})
 
+target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIR})
+
 target_link_libraries(testlws ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a)
