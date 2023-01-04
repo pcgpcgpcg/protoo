@@ -1,5 +1,5 @@
 #include <iostream>
-#include "student.h"
+#include "../include/student.h"
 using namespace std;
 
 Student::Student(string name):name(name){}

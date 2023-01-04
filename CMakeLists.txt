@@ -6,9 +6,7 @@ project(testlws)
 set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2/)
 
 #Bring the headers, such as Student.h into the project
-include_directories(${LIBWEBSOCKETS_DIR}/include)
-
-#include_directories( ${LIBWEBSOCKETS_INCLUDE_DIRS} )
+#include_directories(${LIBWEBSOCKETS_DIR}/include)
 
 FILE(GLOB_RECURSE ALL_SOURCES
           RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
@@ -22,6 +20,6 @@ source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_SOURCES})
 
 add_executable(testlws ${ALL_SOURCES})
 
-target_include_directories(${PROJECT_NAME} PRIVATE ${INCLUDE_DIR})
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
 
-target_link_libraries(testlws ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a)
+target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a)

@@ -1,5 +1,5 @@
 #include <iostream>
-#include "student.h"
+#include "../include/student.h"
 
  int main(int argc, char *argv[]){
     std::cout<<"hello world" << std::endl;
