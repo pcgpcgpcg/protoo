@@ -3,7 +3,9 @@ project(testlws)
 
 #find_package(libwebsockets REQUIRED)
 
-set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2/)
+set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2)
+set(OPENSSL_DIR /usr/local/Cellar/openssl@1.1/1.1.1q)
+set(LIBUV_DIR /usr/local/Cellar/libuv/1.44.2)
 
 #Bring the headers, such as Student.h into the project
 #include_directories(${LIBWEBSOCKETS_DIR}/include)
@@ -21,5 +23,11 @@ source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_SOURCES})
 add_executable(testlws ${ALL_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_DIR}/include)
+target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUV_DIR}/include)
 
-target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a)
+target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a 
+                                      ${OPENSSL_DIR}/lib/libssl.a 
+                                      ${OPENSSL_DIR}/lib/libcrypto.a
+                                      ${LIBUV_DIR}/lib/libuv.a
+                     )
