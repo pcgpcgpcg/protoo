@@ -1,8 +1,16 @@
 #include <iostream>
 #include "../include/student.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
 #include "libwebsockets.h"
 #include "uv.h"
+#ifdef __cplusplus
+}
+#endif
 
+
+static volatile int exit_sig = 0;
 static struct lws_context *context;
 static struct lws *client_wsi;
 static int interrupted, port = 443, ssl_connection = LCCSCF_USE_SSL;
@@ -85,12 +93,34 @@ int main(int argc, char *argv[]){
     info.protocols = protocols;
     info.fd_limit_per_thread = 1 + 1 + 1;
     info.foreign_loops = (void**)(&loop);
-    lws_context *context;
-    context = lws_create_context(&info);
+    lws_context *context = lws_create_context(&info);
     if (!context) {
         lwsl_err("lws init failed\n");
         return 1;
     }
+    
+    char addr_port[256] = { 0 };
+    sprintf(addr_port, "%s:%u", server_address, port&65535);
+    lws_client_connect_info conn_info = { 0 };
+    conn_info.context = context;
+    conn_info.address = server_address;
+    conn_info.port = port;
+    conn_info.ssl_connection = 1;
+    conn_info.path = "./";
+    conn_info.host =  addr_port;
+    conn_info.origin = addr_port;
+    conn_info.protocol = protocols[0].name;
+    
+    lws *wsi = lws_client_connect_via_info(&conn_info);
+    while(!exit_sig){
+        //run poll, max can wait 1000ms
+        lws_service(context, 1000);
+        //当连接可以接受新数据时,触发一次writeable事件回调
+        //当连接正在后台发送数据时，它不能接受新的输入写入请求，所有writeable事件回调不会执行
+        lws_callback_on_writable(wsi);
+    }
+    //destroy context
+    lws_context_destroy(context);
     
     return 0;
 }
