@@ -90,6 +90,9 @@ int main(int argc, char *argv[]){
     lws_context_creation_info info;
     info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
+    info.iface = NULL;
+    info.gid = -1;
+    info.uid = -1;
     info.protocols = protocols;
     info.fd_limit_per_thread = 1 + 1 + 1;
     info.foreign_loops = (void**)(&loop);
