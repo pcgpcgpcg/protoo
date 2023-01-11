@@ -1,9 +1,4 @@
-#include "LWSClient.h"
-
-static struct lws_context_creation_info ctx_info = { 0 };
-static struct lws_context *context = NULL;
-static struct lws_client_connect_info conn_info = { 0 };
-static struct lws *wsi = NULL;
+#include "../../include/network/LWSClient.h"
 
 /**
  * 会话上下文对象，结构根据需要自定义
@@ -96,7 +91,7 @@ LWSClient::~LWSClient()
 /*
 拷贝构造
 */
-LWSClient::LWSClient(const lws_client &obj)
+LWSClient::LWSClient(const LWSClient &obj)
 {
     
 }
@@ -104,42 +99,42 @@ LWSClient::LWSClient(const lws_client &obj)
 /*
 init lwsclient
 */
-void LWSClient::init(v_loop_t* loop)
+void LWSClient::Init(uv_loop_t* loop)
 {
     //uv_loop_t* loop;
     //uv_loop_init(loop);
-    ctx_info.port = CONTEXT_PORT_NO_LISTEN;
-    ctx_info.iface = NULL;
-    ctx_info.protocols = protocols;
-    ctx_info.gid = -1;
-    ctx_info.uid = -1;
+    m_ctxInfo.port = CONTEXT_PORT_NO_LISTEN;
+    m_ctxInfo.iface = NULL;
+    m_ctxInfo.protocols = protocols;
+    m_ctxInfo.gid = -1;
+    m_ctxInfo.uid = -1;
     if (loop)
     {
-        ctx_info.foreign_loops = (void **)(&loop);
+        m_ctxInfo.foreign_loops = (void **)(&loop);
     }
 }
 
 /*
 设置ssl
 */
-int LWSClient::set_ssl(const char* ca_filepath, 
+int LWSClient::SetSSL(const char* ca_filepath,
                             const char* server_cert_filepath,
                             const char*server_private_key_filepath,
                             bool is_support_ssl)
 {
     if(!is_support_ssl)
     {
-        ctx_info.ssl_ca_filepath = NULL;
-        ctx_info.ssl_cert_filepath = NULL;
-        ctx_info.ssl_private_key_filepath = NULL;
+        m_ctxInfo.ssl_ca_filepath = NULL;
+        m_ctxInfo.ssl_cert_filepath = NULL;
+        m_ctxInfo.ssl_private_key_filepath = NULL;
     }
     else
     {
-        ctx_info.ssl_ca_filepath = ca_filepath;
-        ctx_info.ssl_cert_filepath = server_cert_filepath;
-        ctx_info.ssl_private_key_filepath = server_private_key_filepath;
-        ctx_info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    //ctx_info.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
+        m_ctxInfo.ssl_ca_filepath = ca_filepath;
+        m_ctxInfo.ssl_cert_filepath = server_cert_filepath;
+        m_ctxInfo.ssl_private_key_filepath = server_private_key_filepath;
+        m_ctxInfo.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+    //m_ctxInfo.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
     }
 
     return is_support_ssl;
@@ -148,11 +143,11 @@ int LWSClient::set_ssl(const char* ca_filepath,
 /*
 创建客户端
 */
-int LWSClient::create()
+int LWSClient::Create()
 {
     // 创建一个WebSocket处理器
-    context = lws_create_context( &ctx_info );
-    if(!context)
+    m_context = lws_create_context( &m_ctxInfo );
+    if(!m_context)
         return -1;
     return 0;
 }
@@ -160,30 +155,29 @@ int LWSClient::create()
 /*
 连接客户端
 */
-int LWSClient::connect(int is_ssl_support)
+int LWSClient::Connect(int is_ssl_support)
 {
     char addr_port[256] = { 0 };
     sprintf(addr_port, "%s:%u", server_address, port & 65535 );
  
     // 客户端连接参数
-    conn_info = { 0 };
-    conn_info.context = context;
-    conn_info.address = server_address;
-    conn_info.port = port;
+    m_connInfo.context = m_context;
+    m_connInfo.address = server_address;
+    m_connInfo.port = port;
 
     if(!is_ssl_support)
-        conn_info.ssl_connection = 0;
+        m_connInfo.ssl_connection = 0;
     else
-        conn_info.ssl_connection = 1;
-    conn_info.path = "./";
-    conn_info.host = addr_port;
-    conn_info.origin = addr_port;
-    conn_info.protocol = protocols[ 0 ].name;
+        m_connInfo.ssl_connection = 1;
+    m_connInfo.path = "./";
+    m_connInfo.host = addr_port;
+    m_connInfo.origin = addr_port;
+    m_connInfo.protocol = protocols[ 0 ].name;
  
     // 下面的调用触发LWS_CALLBACK_PROTOCOL_INIT事件
     // 创建一个客户端连接
-    wsi = lws_client_connect_via_info( &conn_info );
-    if(!wsi)
+    m_wsi = lws_client_connect_via_info( &m_connInfo );
+    if(!m_wsi)
         return -1;
     return 1;
 }
@@ -191,20 +185,20 @@ int LWSClient::connect(int is_ssl_support)
 /*
 运行客户端
 */
-int LWSClient::run(int wait_time)
+int LWSClient::Run(int wait_time)
 {
-    lws_service( context, wait_time );
+    lws_service( m_context, wait_time );
     /**
      * 下面的调用的意义是：当连接可以接受新数据时，触发一次WRITEABLE事件回调
      * 当连接正在后台发送数据时，它不能接受新的数据写入请求，所有WRITEABLE事件回调不会执行
      */
-    lws_callback_on_writable( wsi );
+    lws_callback_on_writable( m_wsi );
 }
 
 /*
 销毁
 */
-void LWSClient::destroy()
+void LWSClient::Destroy()
 {
-    lws_context_destroy(context);
+    lws_context_destroy(m_context);
 }

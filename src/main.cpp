@@ -1,5 +1,6 @@
 #include <iostream>
 #include "../include/student.h"
+#include "../include/network/LWSClient.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -79,11 +80,34 @@ static const struct lws_protocols protocols[] = {
     LWS_PROTOCOL_LIST_TERM
 };
 
+void sigint_handler(int sig)
+{
+    interrupted = 1;
+}
+
 int main(int argc, char *argv[]){
+    signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
     Student s("joe");
     s.display();
     
+    LWSClient client("49.233.136.247", 13000);
+    client.Init(NULL);
+    client.SetSSL(NULL,NULL,NULL,0);
+    client.Create();
+    client.Connect(0);
+    int n = 0;
+    while(n >= 0 && !interrupted)
+        n = client.Run(1000);
+
+    client.Destroy();
+
+    return 0;
+}
+
+
+//raw test
+static void test_lws_client(){
     uv_loop_t* loop;
     uv_loop_init(loop);
     
@@ -124,6 +148,4 @@ int main(int argc, char *argv[]){
     }
     //destroy context
     lws_context_destroy(context);
-    
-    return 0;
 }
