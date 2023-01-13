@@ -63,8 +63,10 @@ int lws_client_callback( struct lws *wsi,
  */
 struct lws_protocols protocols[] = {
     {
-        //协议名称，协议回调，接收缓冲区大小
-        "ws", lws_client_callback, sizeof( struct session_data ), MAX_PAYLOAD_SIZE,
+        "ws", //Sec-Websockets-Protocol
+        lws_client_callback, //协议回调
+        sizeof( struct session_data ), //自定义数据空间大小：每个ws连接均会分配一个自定义数据空间
+        MAX_PAYLOAD_SIZE,
     },
     {
         NULL, NULL,   0 // 最后一个元素固定为此格式
