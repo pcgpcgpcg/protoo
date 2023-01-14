@@ -15,8 +15,8 @@
 class LWSClient
 {
 private:
-    char *server_address;
-    int port;
+    //char *server_address;
+    //int port;
     lws_context_creation_info m_ctxInfo = {0};
     lws_context *m_context = {NULL};
     lws_client_connect_info m_connInfo={0};
@@ -24,7 +24,6 @@ private:
     
 public:
     LWSClient(char* inputUrl);
-    LWSClient(char *lws_server_address,int port);
     ~LWSClient();
     LWSClient(const LWSClient &obj);
     void Init(uv_loop_t* loop);

@@ -76,24 +76,29 @@ struct lws_protocols protocols[] = {
 /*
 构造函数
 */
-LWSClient::LWSClient(char *_address,int _port)
-{
-    server_address = _address;
-    port = _port;
-}
-
 LWSClient::LWSClient(char* inputUrl){
     // Parse the input url (e.g. wss://echo.websocket.org:1234/test)
-        //   the protocol (wss)
-        //   the address (echo.websocket.org)
-        //   the port (1234)
-        //   the path (/test)
-        const char *urlProtocol;
-        // https://gist.github.com/iUltimateLP/17604e35f0d7a859c7a263075581f99a
-        if (lws_parse_uri(inputURL, &urlProtocol, &clientConnectInfo.address, &clientConnectInfo.port, &urlTempPath))
-        {
-            printf("Couldn't parse URL\n");
-        }
+    //   the protocol (wss)
+    //   the address (echo.websocket.org)
+    //   the port (1234)
+    //   the path (/test)
+    const char *urlProtocol, *urlTempPath;
+    char urlPath[300]; // The final path string
+    //   https://gist.github.com/iUltimateLP/17604e35f0d7a859c7a263075581f99a
+    memset(&m_connInfo, 0, sizeof(m_connInfo));
+    int port = 0;
+    char* address = "";
+    if (lws_parse_uri(inputUrl, &urlProtocol, (const char**)&address, &port, &urlTempPath))
+    {
+        printf("Couldn't parse URL\n");
+    }
+    m_connInfo.address = address;
+    m_connInfo.port = port;
+    // Fix up the urlPath by adding a / at the beginning, copy the temp path, and add a \0 at the end
+    urlPath[0] = '/';
+    strncpy(urlPath + 1, urlTempPath, sizeof(urlPath) - 2);
+    urlPath[sizeof(urlPath) - 1] = '\0';
+    m_connInfo.path = urlPath;
 }
 
 /*
@@ -178,12 +183,12 @@ int LWSClient::Create()
 int LWSClient::Connect(int is_ssl_support)
 {
     char addr_port[256] = { 0 };
-    sprintf(addr_port, "%s:%u", server_address, port & 65535 );
+    //sprintf(addr_port, "%s:%u", server_address, port & 65535 );
  
     // 客户端连接参数
     m_connInfo.context = m_context;
-    m_connInfo.address = server_address;
-    m_connInfo.port = port;
+    //m_connInfo.address = server_address;
+    //m_connInfo.port = port;
 
     if(!is_ssl_support)
         m_connInfo.ssl_connection = 0;
