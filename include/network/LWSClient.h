@@ -23,6 +23,7 @@ private:
     lws *m_wsi = {NULL};
     
 public:
+    LWSClient(char* inputUrl);
     LWSClient(char *lws_server_address,int port);
     ~LWSClient();
     LWSClient(const LWSClient &obj);

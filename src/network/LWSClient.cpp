@@ -82,11 +82,29 @@ LWSClient::LWSClient(char *_address,int _port)
     port = _port;
 }
 
+LWSClient::LWSClient(char* inputUrl){
+    // Parse the input url (e.g. wss://echo.websocket.org:1234/test)
+        //   the protocol (wss)
+        //   the address (echo.websocket.org)
+        //   the port (1234)
+        //   the path (/test)
+        const char *urlProtocol;
+        // https://gist.github.com/iUltimateLP/17604e35f0d7a859c7a263075581f99a
+        if (lws_parse_uri(inputURL, &urlProtocol, &clientConnectInfo.address, &clientConnectInfo.port, &urlTempPath))
+        {
+            printf("Couldn't parse URL\n");
+        }
+}
+
 /*
 析构函数
 */
 LWSClient::~LWSClient()
 {
+    if(m_context){
+        lws_context_destroy(m_context);
+        m_context = NULL;
+    }
     lwsl_notice("析构完成\n");
 }
 
@@ -171,10 +189,10 @@ int LWSClient::Connect(int is_ssl_support)
         m_connInfo.ssl_connection = 0;
     else
         m_connInfo.ssl_connection = 1;
-    m_connInfo.path = "./";
+    m_connInfo.path = "/";
     m_connInfo.host = addr_port;
     m_connInfo.origin = addr_port;
-    m_connInfo.protocol = protocols[ 0 ].name;
+    m_connInfo.protocol = protocols[0].name;
  
     // 下面的调用触发LWS_CALLBACK_PROTOCOL_INIT事件
     // 创建一个客户端连接
