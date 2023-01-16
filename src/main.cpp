@@ -91,7 +91,7 @@ int main(int argc, char *argv[]){
     Student s("joe");
     s.display();
     
-    LWSClient client("ws://49.233.136.247:13000/websocket");
+    LWSClient client("ws://49.233.136.247:13000/");
     client.Init(NULL);
     client.SetSSL(NULL,NULL,NULL,0);
     client.Create();

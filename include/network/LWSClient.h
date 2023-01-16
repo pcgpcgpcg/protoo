@@ -21,6 +21,9 @@ private:
     lws_context *m_context = {NULL};
     lws_client_connect_info m_connInfo={0};
     lws *m_wsi = {NULL};
+private:
+    int pcg_parse_uri(char *p, const char **prot, const char **ads, int *port,
+                                 const char **path);
     
 public:
     LWSClient(char* inputUrl);

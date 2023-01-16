@@ -82,13 +82,17 @@ LWSClient::LWSClient(char* inputUrl){
     //   the address (echo.websocket.org)
     //   the port (1234)
     //   the path (/test)
-    const char *urlProtocol, *urlTempPath;
+    const char *urlProtocol = NULL, *urlTempPath = NULL;
     char urlPath[300]; // The final path string
     //   https://gist.github.com/iUltimateLP/17604e35f0d7a859c7a263075581f99a
     memset(&m_connInfo, 0, sizeof(m_connInfo));
     int port = 0;
-    char* address = "";
-    if (lws_parse_uri(inputUrl, &urlProtocol, (const char**)&address, &port, &urlTempPath))
+    const char* address = NULL;
+    //char tmp_url[512] = {0};
+    char *tmp_url = new char[1024];
+    memset(tmp_url, 0, 1024);
+    strncpy(tmp_url,inputUrl,1024);
+    if (lws_parse_uri((char*)tmp_url, &urlProtocol, &address, &port, &urlTempPath))
     {
         printf("Couldn't parse URL\n");
     }
@@ -99,6 +103,7 @@ LWSClient::LWSClient(char* inputUrl){
     strncpy(urlPath + 1, urlTempPath, sizeof(urlPath) - 2);
     urlPath[sizeof(urlPath) - 1] = '\0';
     m_connInfo.path = urlPath;
+    delete[] tmp_url;
 }
 
 /*
@@ -212,12 +217,13 @@ int LWSClient::Connect(int is_ssl_support)
 */
 int LWSClient::Run(int wait_time)
 {
-    lws_service( m_context, wait_time );
+    int n = lws_service( m_context, wait_time );
     /**
      * 下面的调用的意义是：当连接可以接受新数据时，触发一次WRITEABLE事件回调
      * 当连接正在后台发送数据时，它不能接受新的数据写入请求，所有WRITEABLE事件回调不会执行
      */
     lws_callback_on_writable( m_wsi );
+    return n;
 }
 
 /*
