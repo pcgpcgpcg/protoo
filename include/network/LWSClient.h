@@ -9,6 +9,9 @@
 //#ifdef __cplusplus
 //}
 //#endif
+#include <iostream>
+#include <string>
+#include<queue>
 
 #define MAX_PAYLOAD_SIZE 1024
 
@@ -21,6 +24,9 @@ private:
     lws_context *m_context = {NULL};
     lws_client_connect_info m_connInfo={0};
     lws *m_wsi = {NULL};
+    bool m_isSupportSSL = {false};
+    bool m_interrupted = {false};
+    std::queue<std::string> messageQueue; //messages to send
 private:
     int pcg_parse_uri(char *p, const char **prot, const char **ads, int *port,
                                  const char **path);
@@ -32,12 +38,12 @@ public:
     void Init(uv_loop_t* loop);
     int SetSSL(const char* ca_filepath,
                const char* server_cert_filepath,
-               const char*server_private_key_filepath,
-               bool is_support_ssl);
+               const char*server_private_key_filepath);
     int Create();
-    int Connect(int is_ssl_support);
+    void Connect(lws_sorted_usec_list_t *sul);
     int Run(int wait_time);
     void Destroy();
+    void Send(std::string message);
 };
 
 

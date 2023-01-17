@@ -93,7 +93,7 @@ int main(int argc, char *argv[]){
     
     LWSClient client("ws://49.233.136.247:13000/");
     client.Init(NULL);
-    client.SetSSL(NULL,NULL,NULL,0);
+    client.SetSSL(NULL,NULL,NULL);
     client.Create();
     client.Connect(0);
     int n = 0;

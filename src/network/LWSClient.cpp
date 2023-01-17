@@ -1,5 +1,7 @@
 #include "../../include/network/LWSClient.h"
 
+typedef void (LWSClient::*Connect1)(lws_sorted_usec_list_t *sul);    //指向参数为空，返回值为空的成员函数指针
+
 /**
  * 会话上下文对象，结构根据需要自定义
  */
@@ -71,6 +73,19 @@ struct lws_protocols protocols[] = {
     {
         NULL, NULL,   0 // 最后一个元素固定为此格式
     }
+};
+
+//The retry and backoff policy we want to use for our client connections
+const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 5000 };
+const lws_retry_bo_t retry = {
+   .retry_ms_table            = backoff_ms,
+   .retry_ms_table_count        = LWS_ARRAY_SIZE(backoff_ms),
+   .conceal_count            = LWS_ARRAY_SIZE(backoff_ms),
+
+   .secs_since_valid_ping        = 3,  /* force PINGs after secs idle */
+   .secs_since_valid_hangup    = 10, /* hangup after secs idle */
+
+   .jitter_percent            = 20,
 };
 
 /*
@@ -149,10 +164,9 @@ void LWSClient::Init(uv_loop_t* loop)
 */
 int LWSClient::SetSSL(const char* ca_filepath,
                             const char* server_cert_filepath,
-                            const char*server_private_key_filepath,
-                            bool is_support_ssl)
+                            const char*server_private_key_filepath)
 {
-    if(!is_support_ssl)
+    if(!m_isSupportSSL)
     {
         m_ctxInfo.ssl_ca_filepath = NULL;
         m_ctxInfo.ssl_cert_filepath = NULL;
@@ -166,8 +180,7 @@ int LWSClient::SetSSL(const char* ca_filepath,
         m_ctxInfo.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
     //m_ctxInfo.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
     }
-
-    return is_support_ssl;
+    return this->m_isSupportSSL;
 }
 
 /*
@@ -185,7 +198,7 @@ int LWSClient::Create()
 /*
 连接客户端
 */
-int LWSClient::Connect(int is_ssl_support)
+void LWSClient::Connect(lws_sorted_usec_list_t *sul)
 {
     char addr_port[256] = { 0 };
     //sprintf(addr_port, "%s:%u", server_address, port & 65535 );
@@ -195,7 +208,7 @@ int LWSClient::Connect(int is_ssl_support)
     //m_connInfo.address = server_address;
     //m_connInfo.port = port;
 
-    if(!is_ssl_support)
+    if(!m_isSupportSSL)
         m_connInfo.ssl_connection = 0;
     else
         m_connInfo.ssl_connection = 1;
@@ -207,8 +220,23 @@ int LWSClient::Connect(int is_ssl_support)
     // 下面的调用触发LWS_CALLBACK_PROTOCOL_INIT事件
     // 创建一个客户端连接
     m_wsi = lws_client_connect_via_info( &m_connInfo );
-    if(!m_wsi)
+    if(!m_wsi){
+        /*
+         * Failed... schedule a retry... we can't use the _retry_wsi()
+         * convenience wrapper api here because no valid wsi at this
+         * point.
+         */
+        uint16_t retrycount = 10;
+        Connect1 conn = &LWSClient::Connect;
+        //传递lambda函数是否可以
+        if (lws_retry_sul_schedule(m_context, 0, sul, &retry,
+                                   this->*conn, &retrycount)) {
+            lwsl_err("%s: connection attempts exhausted\n", __func__);
+            m_interrupted = true;
+        }
         return -1;
+    }
+        
     return 1;
 }
 
@@ -232,4 +260,9 @@ int LWSClient::Run(int wait_time)
 void LWSClient::Destroy()
 {
     lws_context_destroy(m_context);
+}
+
+void LWSClient::Send(std::string message){
+    //https://github.com/maurodelazeri/RaccoonWSClient/blob/master/WsRaccoonClient.cc
+    //https://github.com/David-Alderson-Bose/websocket-to-me/blob/master/src/sockie.cpp
 }
