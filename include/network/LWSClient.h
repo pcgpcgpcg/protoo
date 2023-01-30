@@ -36,11 +36,11 @@ public:
     ~LWSClient();
     LWSClient(const LWSClient &obj);
     void Init(uv_loop_t* loop);
-    int SetSSL(const char* ca_filepath,
-               const char* server_cert_filepath,
-               const char*server_private_key_filepath);
+//    int SetSSL(const char* ca_filepath,
+//               const char* server_cert_filepath,
+//               const char*server_private_key_filepath);
     int Create();
-    void Connect(lws_sorted_usec_list_t *sul);
+    //void Connect(lws_sorted_usec_list_t *sul);
     int Run(int wait_time);
     void Destroy();
     void Send(std::string message);

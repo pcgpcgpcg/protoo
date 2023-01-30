@@ -11,6 +11,81 @@ struct session_data {
     int len;
 };
 
+static struct ConnectionInfo {
+    lws_sorted_usec_list_t    sul;         //schedule connection retry
+    struct lws_client_connect_info *conn_info; //connection informations
+    struct lws        *wsi;         //related wsi if any
+    uint16_t        retry_count; //count of consequetive retries
+} g_connInfo;
+
+static const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 5000 };
+static const lws_retry_bo_t retry = {
+    .retry_ms_table            = backoff_ms,
+    .retry_ms_table_count        = LWS_ARRAY_SIZE(backoff_ms),
+    .conceal_count            = LWS_ARRAY_SIZE(backoff_ms),
+
+    .secs_since_valid_ping        = 400,  /* force PINGs after secs idle */
+    .secs_since_valid_hangup    = 400, /* hangup after secs idle */
+
+    .jitter_percent            = 0,
+};
+
+//断线重连实现
+static void Connect(lws_sorted_usec_list_t *sul)
+{
+    struct ConnectionInfo *cinfo = lws_container_of(sul, struct ConnectionInfo, sul);
+    if(!cinfo){
+        return;
+    }
+    
+    if (!lws_client_connect_via_info(cinfo->conn_info))
+        /*
+         * Failed... schedule a retry... we can't use the _retry_wsi()
+         * convenience wrapper api here because no valid wsi at this
+         * point.
+         */
+        if (lws_retry_sul_schedule(cinfo->conn_info->context, 0, sul, &retry,
+                                   Connect, &mco->retry_count)) {
+            lwsl_err("%s: connection attempts exhausted\n", __func__);
+            interrupted = 1;
+        }
+    
+//        i.context = context;
+//        i.port = 443;
+//        i.address = "fstream.binance.com";
+//        i.path = "/";
+//        i.host = i.address;
+//        i.origin = i.address;
+//        i.ssl_connection = LCCSCF_USE_SSL | LCCSCF_PRIORITIZE_READS;
+//        i.protocol = NULL;
+//        i.local_protocol_name = "lws-minimal-client";
+//        i.pwsi = &mco->wsi;
+//        i.retry_and_idle_policy = &retry;
+//        i.userdata = mco;
+ 
+    // 下面的调用触发LWS_CALLBACK_PROTOCOL_INIT事件
+    // 创建一个客户端连接
+    m_wsi = lws_client_connect_via_info( &m_connInfo );
+    if(!m_wsi){
+        /*
+         * Failed... schedule a retry... we can't use the _retry_wsi()
+         * convenience wrapper api here because no valid wsi at this
+         * point.
+         */
+        uint16_t retrycount = 10;
+        Connect1 conn = &LWSClient::Connect;
+        //传递lambda函数是否可以
+        if (lws_retry_sul_schedule(m_context, 0, sul, &retry,
+                                   this->*conn, &retrycount)) {
+            lwsl_err("%s: connection attempts exhausted\n", __func__);
+            m_interrupted = true;
+        }
+        return -1;
+    }
+        
+    return 1;
+}
+
 /**
  * 某个协议下的连接发生事件时，执行的回调函数
  *
@@ -113,6 +188,18 @@ LWSClient::LWSClient(char* inputUrl){
     }
     m_connInfo.address = address;
     m_connInfo.port = port;
+    m_connInfo.path = "/";
+    m_connInfo.host = m_connInfo.address;
+    m_connInfo.origin = m_connInfo.address;
+    m_connInfo.protocol = protocols[0].name;
+    m_ctxInfo.ssl_ca_filepath = NULL;
+    m_ctxInfo.ssl_cert_filepath = NULL;
+    m_ctxInfo.ssl_private_key_filepath = NULL;
+    if(!strcmp(urlProtocol,"wss")){
+        m_connInfo.ssl_connection = 1;
+    }else{
+        m_connInfo.ssl_connection = 1;
+    }
     // Fix up the urlPath by adding a / at the beginning, copy the temp path, and add a \0 at the end
     urlPath[0] = '/';
     strncpy(urlPath + 1, urlTempPath, sizeof(urlPath) - 2);
@@ -162,26 +249,26 @@ void LWSClient::Init(uv_loop_t* loop)
 /*
 设置ssl
 */
-int LWSClient::SetSSL(const char* ca_filepath,
-                            const char* server_cert_filepath,
-                            const char*server_private_key_filepath)
-{
-    if(!m_isSupportSSL)
-    {
-        m_ctxInfo.ssl_ca_filepath = NULL;
-        m_ctxInfo.ssl_cert_filepath = NULL;
-        m_ctxInfo.ssl_private_key_filepath = NULL;
-    }
-    else
-    {
-        m_ctxInfo.ssl_ca_filepath = ca_filepath;
-        m_ctxInfo.ssl_cert_filepath = server_cert_filepath;
-        m_ctxInfo.ssl_private_key_filepath = server_private_key_filepath;
-        m_ctxInfo.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    //m_ctxInfo.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
-    }
-    return this->m_isSupportSSL;
-}
+//int LWSClient::SetSSL(const char* ca_filepath,
+//                            const char* server_cert_filepath,
+//                            const char*server_private_key_filepath)
+//{
+//    if(!m_isSupportSSL)
+//    {
+//        m_ctxInfo.ssl_ca_filepath = NULL;
+//        m_ctxInfo.ssl_cert_filepath = NULL;
+//        m_ctxInfo.ssl_private_key_filepath = NULL;
+//    }
+//    else
+//    {
+//        m_ctxInfo.ssl_ca_filepath = ca_filepath;
+//        m_ctxInfo.ssl_cert_filepath = server_cert_filepath;
+//        m_ctxInfo.ssl_private_key_filepath = server_private_key_filepath;
+//        m_ctxInfo.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+//    //m_ctxInfo.options |= LWS_SERVER_OPTION_REQUIRE_VALID_OPENSSL_CLIENT_CERT;
+//    }
+//    return this->m_isSupportSSL;
+//}
 
 /*
 创建客户端
@@ -192,53 +279,13 @@ int LWSClient::Create()
     m_context = lws_create_context( &m_ctxInfo );
     if(!m_context)
         return -1;
+    // 客户端连接参数
+    m_connInfo.context = m_context;
     return 0;
 }
 
 /*
-连接客户端
-*/
-void LWSClient::Connect(lws_sorted_usec_list_t *sul)
-{
-    char addr_port[256] = { 0 };
-    //sprintf(addr_port, "%s:%u", server_address, port & 65535 );
- 
-    // 客户端连接参数
-    m_connInfo.context = m_context;
-    //m_connInfo.address = server_address;
-    //m_connInfo.port = port;
 
-    if(!m_isSupportSSL)
-        m_connInfo.ssl_connection = 0;
-    else
-        m_connInfo.ssl_connection = 1;
-    m_connInfo.path = "/";
-    m_connInfo.host = addr_port;
-    m_connInfo.origin = addr_port;
-    m_connInfo.protocol = protocols[0].name;
- 
-    // 下面的调用触发LWS_CALLBACK_PROTOCOL_INIT事件
-    // 创建一个客户端连接
-    m_wsi = lws_client_connect_via_info( &m_connInfo );
-    if(!m_wsi){
-        /*
-         * Failed... schedule a retry... we can't use the _retry_wsi()
-         * convenience wrapper api here because no valid wsi at this
-         * point.
-         */
-        uint16_t retrycount = 10;
-        Connect1 conn = &LWSClient::Connect;
-        //传递lambda函数是否可以
-        if (lws_retry_sul_schedule(m_context, 0, sul, &retry,
-                                   this->*conn, &retrycount)) {
-            lwsl_err("%s: connection attempts exhausted\n", __func__);
-            m_interrupted = true;
-        }
-        return -1;
-    }
-        
-    return 1;
-}
 
 /*
 运行客户端
