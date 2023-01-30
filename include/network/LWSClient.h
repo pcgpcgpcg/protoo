@@ -41,7 +41,7 @@ public:
 //               const char*server_private_key_filepath);
     int Create();
     //void Connect(lws_sorted_usec_list_t *sul);
-    int Run(int wait_time);
+    int Run(int* interrupted);
     void Destroy();
     void Send(std::string message);
 };

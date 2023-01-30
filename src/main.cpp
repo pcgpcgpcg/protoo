@@ -91,14 +91,14 @@ int main(int argc, char *argv[]){
     Student s("joe");
     s.display();
     
-    LWSClient client("ws://49.233.136.247:13000/");
+    LWSClient client("ws://152.136.16.141:13000/");
     client.Init(NULL);
-    client.SetSSL(NULL,NULL,NULL);
+    //client.SetSSL(NULL,NULL,NULL);
     client.Create();
-    client.Connect(0);
+    //client.Connect(0);
     int n = 0;
     while(n >= 0 && !interrupted)
-        n = client.Run(1000);
+        n = client.Run(&interrupted);
 
     client.Destroy();
 
