@@ -44,8 +44,13 @@ static const lws_retry_bo_t retry = {
     .secs_since_valid_ping        = 400,  /* force PINGs after secs idle */
     .secs_since_valid_hangup    = 400, /* hangup after secs idle */
 
-    .jitter_percent            = 0,
+    .jitter_percent            = 2,
 };
+//sets a validity regime of testing validity with PING every 3s and failing if it didn't get the PONG back within 10s.
+//static const lws_retry_bo_t retry = {
+//    .secs_since_valid_ping = 3, //
+//    .secs_since_valid_hangup = 10,
+//};
 
 //断线重连实现
 static void connect_client(lws_sorted_usec_list_t *sul)
@@ -135,6 +140,7 @@ static int lws_client_callback( struct lws *wsi,
         case LWS_CALLBACK_CLIENT_ESTABLISHED:   // 连接到服务器后的回调
             lwsl_notice( "Connected to server ok!\n" );
             cinfo->wsi = wsi;
+            lws_callback_on_writable(wsi);
             break;
  
         case LWS_CALLBACK_CLIENT_RECEIVE:       // 接收到服务器数据后的回调，数据为in，其长度为len
@@ -154,6 +160,9 @@ static int lws_client_callback( struct lws *wsi,
             break;
         case LWS_CALLBACK_CLIENT_CLOSED:
             goto do_retry;
+        case LWS_CALLBACK_PROTOCOL_DESTROY:
+            lws_sul_cancel(&cinfo->sul);
+            break;
 
         default:
             break;
@@ -197,8 +206,8 @@ LWSClient::LWSClient(char* inputUrl){
     m_connInfo.address = address;
     m_connInfo.port = port;
     m_connInfo.path = "/";
-    m_connInfo.host = m_connInfo.address;
-    m_connInfo.origin = m_connInfo.address;
+    m_connInfo.host = m_connInfo.address; //just set to the server address
+    m_connInfo.origin = m_connInfo.address; //just set to the server address
     m_connInfo.protocol = protocols[0].name;
     m_ctxInfo.ssl_ca_filepath = NULL;
     m_ctxInfo.ssl_cert_filepath = NULL;
@@ -244,10 +253,11 @@ void LWSClient::Init(uv_loop_t* loop)
     //uv_loop_t* loop;
     //uv_loop_init(loop);
     m_ctxInfo.port = CONTEXT_PORT_NO_LISTEN;
-    m_ctxInfo.iface = NULL;
+    m_ctxInfo.iface = NULL;//which ethernet such as eth1、eth2,set to NULL can listen all eth
     m_ctxInfo.protocols = protocols;
     m_ctxInfo.gid = -1;
     m_ctxInfo.uid = -1;
+    //m_ctxInfo.options |= LWS_SERVER_OPTION_LIBUV;//maybe just for vhost
     if (loop)
     {
         m_ctxInfo.foreign_loops = (void **)(&loop);
@@ -297,6 +307,7 @@ int LWSClient::Create()
 //运行客户端
 int LWSClient::Run(int* interrupted)
 {
+    *interrupted = g_connInfo.interrupted;
     //可能需要起一个线程来循环这个情况,需要跟loop关联起来
     int n = lws_service( m_context, 0 );
     /**
