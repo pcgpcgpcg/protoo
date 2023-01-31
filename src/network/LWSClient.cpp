@@ -212,6 +212,10 @@ LWSClient::LWSClient(char* inputUrl){
     m_ctxInfo.ssl_ca_filepath = NULL;
     m_ctxInfo.ssl_cert_filepath = NULL;
     m_ctxInfo.ssl_private_key_filepath = NULL;
+    //TODO for ping
+    //m_ctxInfo.ka_time = LWS_TCP_KEEPALIVE_TIME;
+    //m_ctxInfo.ka_interval = LWS_TCP_KEEPALIVE_INTERVAL;
+    //m_ctxInfo.ka_probes = LWS_TCP_KEEPALIVE_PROBES;
     if(!strcmp(urlProtocol,"wss")){
         m_connInfo.ssl_connection = 1;
     }else{
