@@ -39,7 +39,7 @@ static const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 5000 };
 static const lws_retry_bo_t retry = {
     .retry_ms_table            = backoff_ms,
     .retry_ms_table_count        = LWS_ARRAY_SIZE(backoff_ms),
-    .conceal_count            = LWS_ARRAY_SIZE(backoff_ms),
+    .conceal_count            = LWS_RETRY_CONCEAL_ALWAYS, //LWS_ARRAY_SIZE(backoff_ms),
 
     .secs_since_valid_ping        = 400,  /* force PINGs after secs idle */
     .secs_since_valid_hangup    = 400, /* hangup after secs idle */
