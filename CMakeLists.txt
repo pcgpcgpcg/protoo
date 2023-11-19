@@ -1,11 +1,22 @@
 cmake_minimum_required(VERSION 3.21)
-project(testlws)
+project(protoo_demo)
 
 #find_package(libwebsockets REQUIRED)
 
-set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2)
-set(OPENSSL_DIR /usr/local/Cellar/openssl@1.1/1.1.1q)
-set(LIBUV_DIR /usr/local/Cellar/libuv/1.44.2)
+if (WIN32)
+    # Windows-specific commands here
+elseif (UNIX)
+    # Unix-specific commands here
+elseif (APPLE)
+    # Apple-specific commands here
+    set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2)
+    set(OPENSSL_DIR /usr/local/Cellar/openssl@1.1/1.1.1q)
+    set(LIBUV_DIR /usr/local/Cellar/libuv/1.44.2)
+elseif (ANDROID)
+    # Android-specific commands here
+elseif (IOS)
+    # iOS-specific commands here
+endif()
 
 #Bring the headers, such as Student.h into the project
 #include_directories(${LIBWEBSOCKETS_DIR}/include)
@@ -20,7 +31,7 @@ source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_SOURCES})
 #However, the file(GLOB...) or (GLOB_RECURSE...) allows for wildcard additions:
 #file(GLOB SOURCES "src/*.cpp" main.cpp)
 
-add_executable(testlws ${ALL_SOURCES})
+add_executable(protoo_demo ${ALL_SOURCES})
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_DIR}/include)
