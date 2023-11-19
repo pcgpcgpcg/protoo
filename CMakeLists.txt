@@ -12,8 +12,8 @@ set(LIBUV_DIR /usr/local/Cellar/libuv/1.44.2)
 
 FILE(GLOB_RECURSE ALL_SOURCES
           RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} 
-          ${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp
-          ${CMAKE_CURRENT_SOURCE_DIR}/include/*.h)
+          ${CMAKE_CURRENT_SOURCE_DIR}/client/src/*.cpp
+          ${CMAKE_CURRENT_SOURCE_DIR}/client/include/*.h)
 source_group(TREE ${CMAKE_SOURCE_DIR} FILES ${ALL_SOURCES})
 #Can manually add the sources using the set command as follows:
 #set(SOURCES src/mainapp.cpp src/Student.cpp)
