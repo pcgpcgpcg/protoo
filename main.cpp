@@ -1,6 +1,5 @@
 #include <iostream>
-#include "../include/student.h"
-#include "../include/network/LWSClient.h"
+#include "Message.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -88,64 +87,8 @@ void sigint_handler(int sig)
 int main(int argc, char *argv[]){
     signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
-    Student s("joe");
-    s.display();
-    
-    LWSClient client("ws://152.136.16.141:13000/");
-    client.Init(NULL);
-    //client.SetSSL(NULL,NULL,NULL);
-    client.Create();
-    //client.Connect(0);
-    int n = 0;
-    while(n >= 0 && !interrupted)
-        n = client.Run(&interrupted);
-
-    client.Destroy();
 
     return 0;
 }
 
 
-//raw test
-static void test_lws_client(){
-    uv_loop_t* loop;
-    uv_loop_init(loop);
-    
-    lws_context_creation_info info;
-    info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-    info.port = CONTEXT_PORT_NO_LISTEN; /* we do not run any server */
-    info.iface = NULL;
-    info.gid = -1;
-    info.uid = -1;
-    info.protocols = protocols;
-    info.fd_limit_per_thread = 1 + 1 + 1;
-    info.foreign_loops = (void**)(&loop);
-    lws_context *context = lws_create_context(&info);
-    if (!context) {
-        lwsl_err("lws init failed\n");
-        return 1;
-    }
-    
-    char addr_port[256] = { 0 };
-    sprintf(addr_port, "%s:%u", server_address, port&65535);
-    lws_client_connect_info conn_info = { 0 };
-    conn_info.context = context;
-    conn_info.address = server_address;
-    conn_info.port = port;
-    conn_info.ssl_connection = 1;
-    conn_info.path = "./";
-    conn_info.host =  addr_port;
-    conn_info.origin = addr_port;
-    conn_info.protocol = protocols[0].name;
-    
-    lws *wsi = lws_client_connect_via_info(&conn_info);
-    while(!exit_sig){
-        //run poll, max can wait 1000ms
-        lws_service(context, 1000);
-        //当连接可以接受新数据时,触发一次writeable事件回调
-        //当连接正在后台发送数据时，它不能接受新的输入写入请求，所有writeable事件回调不会执行
-        lws_callback_on_writable(wsi);
-    }
-    //destroy context
-    lws_context_destroy(context);
-}
