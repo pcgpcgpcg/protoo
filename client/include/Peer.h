@@ -66,17 +66,17 @@ namespace protoo {
 		void handleResponse(json response);
 		void handleNotification(json notification);
 
-	public:
-		event::emitter_t<std::shared_ptr<PROTOO_MSG>> m_emitter;
+	// public:
+	// 	event::emitter_t<std::shared_ptr<PROTOO_MSG>> m_emitter;
 
 	private:
 		bool m_closed = false;
-		unique_ptr<WebSocketTransport> m_pTransport;
+		//unique_ptr<WebSocketTransport> m_pTransport;
 		bool m_connected = false;
 		json m_data = json({});
 		map<int, shared_ptr<SENT_MSG>> m_sents;
-		PeerTimer mTimer;
-		unique_ptr<std::promise<nlohmann::json>> m_pPromise;
+		//PeerTimer mTimer;
+		//unique_ptr<std::promise<nlohmann::json>> m_pPromise;
 		// Queue to maintain the receive tasks when there are no messages(yet).
 
 	};
