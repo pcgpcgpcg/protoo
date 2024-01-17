@@ -1,0 +1,215 @@
+#include "WebSocketTransport.h"
+#include "Message.h"
+//#include <cpprest/asyncrt_utils.h>
+//using namespace std;
+//using namespace nlohmann;
+//constructor
+#define TRANSPORT_LOG_ENABLE 1
+
+WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) {
+   std::regex ex("(ws|wss)://([^/ :]+):?([^/ ]*)(/?[^ #]*)");
+    std::cmatch what;
+    if (regex_match(url.c_str(), what, ex))
+    {
+        std::string protocol = std::string(what[1].first, what[1].second);
+        std::string domain = std::string(what[2].first, what[2].second);
+        std::string port = std::string(what[3].first, what[3].second);
+        std::string path = std::string(what[4].first, what[4].second);
+        //string query    = string(what[5].first, what[5].second);
+        m_prefix = protocol;
+        m_path = path;
+        m_url = domain;
+        if (port == "") {
+            if (protocol == "ws") {
+                m_port = 80;
+            }
+            else {
+                m_port = 443;
+            }
+        }
+        else {
+            m_port = atoi(port.c_str());
+        }
+    }
+    m_closed = false;
+    //m_options = options;
+    m_listener = listener;
+	m_closed = false;
+    //set protocols
+    m_protocols[0] = {
+        "protoo",
+        [](struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) -> int
+        {
+            // auto pSelf = (WebSocketTransport*)lws_context_user(lws_get_context(wsi));
+            auto *pSelf = (WebSocketTransport *)user;
+            if (!pSelf->m_listener)
+            {
+                return 0;
+            }
+            switch (reason)
+            {
+            case LWS_CALLBACK_CLIENT_ESTABLISHED:
+                pSelf->m_listener->onOpen();
+                break;
+            case LWS_CALLBACK_CLIENT_RECEIVE:
+                if (len > 0)
+                {
+                    pSelf->m_receivedMsg.append((const char *)in, len);
+                    if (lws_is_final_fragment(wsi))
+                    {
+                        auto jmsg = protoo::Message::parse(pSelf->m_receivedMsg);
+                        pSelf->m_listener->onMessage(jmsg);
+                        pSelf->m_receivedMsg.clear();
+                    }
+                }
+                break;
+            case LWS_CALLBACK_CLIENT_WRITEABLE:
+                if (!pSelf->m_msgQueue.empty())
+                {
+                    auto msg = pSelf->m_msgQueue.front();
+                    pSelf->m_msgQueue.pop();
+                    auto *p = (unsigned char *)malloc(LWS_SEND_BUFFER_PRE_PADDING + msg.length() + LWS_SEND_BUFFER_POST_PADDING);
+                    memcpy(p + LWS_SEND_BUFFER_PRE_PADDING, msg.c_str(), msg.length());
+                    lws_write(wsi, p + LWS_SEND_BUFFER_PRE_PADDING, msg.length(), LWS_WRITE_TEXT);
+                    free(p);
+                }
+                else
+                {
+                    pSelf->m_noMsg = true;
+                    // cout << "Send keep-alive message" << endl;
+                    // uint8_t ping[LWS_PRE + 125];
+                    // lws_write(wsi, ping + LWS_PRE, 0, LWS_WRITE_PING);
+                }
+                break;
+            case LWS_CALLBACK_CLIENT_CLOSED:
+                pSelf->m_wsClient = nullptr;
+                pSelf->m_listener->onClosed();
+                break;
+            case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+                pSelf->m_listener->onFailed();
+                break;
+            case LWS_CALLBACK_WSI_DESTROY:
+                cout << "[ws Connection destruction]" << endl;
+                pSelf->m_wsClient = nullptr;
+                break;
+
+            default:
+                break;
+            }
+            return 0;
+        },
+        0,
+        1024,
+        0,
+        this,
+        10} m_protocols[1] = {NULL, NULL, 0, 0, 0, NULL, 0};
+    //lauch websocket connection
+	runWebSocket();
+}
+
+WebSocketTransport::~WebSocketTransport()
+{
+    m_stopped = true;
+    if (m_pWsThread && m_pWsThread->joinable())
+    {
+        m_pWsThread->join();
+    }
+    if (m_pWsThread)
+    {
+        delete m_pWsThread;
+        m_pWsThread = nullptr;
+    }
+}
+
+bool WebSocketTransport::closed() {
+	return m_closed;
+}
+
+void WebSocketTransport::close() {
+	if (m_closed) {
+		return;
+	}
+	m_closed = true;
+	m_listener->onClosed();
+}
+
+void WebSocketTransport::send(json message)
+{
+    auto msg = message.dump();
+	m_msgQueue.push(msg);
+    m_noMsg = false;
+    if(m_wsClient){
+        lws_callback_on_writable(m_wsClient);
+    }
+}
+#ifdef _WIN32
+
+#elif defined __linux__
+uint32_t GetCurrentThreadId() {
+	return 0;
+}
+
+#elif defined __APPLE__
+uint32_t GetCurrentThreadId() {
+	return 0;
+}
+#elif defined __unix__
+uint32_t GetCurrentThreadId() {
+	return 0;
+}
+#else
+
+#endif
+
+
+//TODO should handle exception on connnect
+void WebSocketTransport::runWebSocket() {
+    //开启一个新的线程，用于websocket连接
+    m_pWsThread = new std::thread([this]() { 
+        lws_context_creation_info info;
+        memset(&info, 0, sizeof(info));
+        info.port = CONTEXT_PORT_NO_LISTEN;
+        info.protocols = m_protocols;
+        info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+        info.fd_limit_per_thread = 1024;
+        info.ssl_cert_filepath = NULL;
+        info.ssl_private_key_filepath = NULL;
+        info.gid = -1;
+        info.uid = -1;
+        info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+        info.ws_ping_pong_interval = 10;
+        info.ka_time = 10;
+        info.ka_probes = 10;
+        info.ka_interval = 10;
+        if(m_context == nullptr){
+            m_context = lws_create_context(&info);
+            if(!m_context){
+                std::cout << "lws init failed" << std::endl;
+                return;
+            }
+        }
+        lws_client_connection_info ccinfo = {0};
+        memset(&ccinfo, 0, sizeof(ccinfo));
+        ccinfo.context = m_context;
+        ccinfo.ssl_connection = 0;//0 will disable ssl and enable ssl set the follow: LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+        ccinfo.address = m_url.c_str();
+        ccinfo.port = m_port;
+        ccinfo.path = m_path.c_str();
+        ccinfo.origin = m_url.c_str();
+        ccinfo.protocol = m_protocols[0].name;
+        ccinfo.userdata = this;
+        m_wsClient = lws_client_connect_via_info(&ccinfo);
+        while(!m_closed || !m_noMsg){
+            //此处需研究实现重连机制
+            lws_service(m_context, 50);
+        }
+        lws_context_destroy(m_context);
+        m_wsClient = nullptr;
+        std::cout<<"websocket thread exit"<<std::endl;
+    });
+}
+
+void WebSocketTransport::handleMessages(std::string message) {
+	auto jmsg = protoo::Message::parse(message);
+	m_listener->onMessage(jmsg);
+}

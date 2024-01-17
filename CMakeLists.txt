@@ -50,15 +50,13 @@ message(STATUS PROJECT_NAME = ${PROJECT_NAME})
 FILE(GLOB_RECURSE all_source_files "client/src/*.cpp", "main.cpp")
 FILE(GLOB_RECURSE all_head_files "client/include/*.h")
 
-add_subdirectory(thirdparty/nlohmann_json)
-
 add_executable(
             ${PROJECT_NAME} 
             ${all_head_files}
             ${all_source_files}
 )
 
-target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/thirdparty/nlohmann_json/single_include/nlohmann)
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/thirdparty/nlohmann)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include/transports)
 
@@ -71,4 +69,3 @@ target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a
                                       ${OPENSSL_DIR}/lib/libcrypto.a
                                       ${LIBUV_DIR}/lib/libuv.a
                      )
-target_link_libraries(${PROJECT_NAME} nlohmann_json::nlohmann_json)
