@@ -24,6 +24,13 @@ struct SENT_MSG {
 	function<void()> close;
 };
 
+struct SentRequest {
+	std::string id;
+	std::string method;
+	shared_ptr<future<string>> response;
+	lws_sul schedule; //libwebsockets的计划任务
+}
+
 namespace protoo {
 	class PeerError : public std::runtime_error
 	{
@@ -71,7 +78,7 @@ namespace protoo {
 
 	private:
 		bool m_closed = false;
-		//unique_ptr<WebSocketTransport> m_pTransport;
+		unique_ptr<WebSocketTransport> m_pTransport;
 		bool m_connected = false;
 		json m_data = json({});
 		map<int, shared_ptr<SENT_MSG>> m_sents;
