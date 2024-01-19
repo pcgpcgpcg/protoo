@@ -48,6 +48,7 @@ private:
     void runWebSocket();
 
 public:
+    void scheduleTask(int afterMs, std::function<void()> task); 
     void handleMessages(std::string message);
 
 private:
@@ -76,6 +77,8 @@ private:
     // Pending messages queue
     std::queue<std::string> m_msgQueue;
     TransportListener *m_listener{nullptr};
+    std::function<void()> m_task;
+    lws_sorted_usec_list_t m_sul;
 };
 
 #endif

@@ -27,9 +27,8 @@ struct SENT_MSG {
 struct SentRequest {
 	std::string id;
 	std::string method;
-	shared_ptr<future<string>> response;
-	lws_sul schedule; //libwebsockets的计划任务
-}
+	shared_ptr<promise<json>> response;
+};
 
 namespace protoo {
 	class PeerError : public std::runtime_error
@@ -82,6 +81,7 @@ namespace protoo {
 		bool m_connected = false;
 		json m_data = json({});
 		map<int, shared_ptr<SENT_MSG>> m_sents;
+		std::map<int, std::shared_ptr<std::promise<json>>> m_promises;
 		//PeerTimer mTimer;
 		//unique_ptr<std::promise<nlohmann::json>> m_pPromise;
 		// Queue to maintain the receive tasks when there are no messages(yet).

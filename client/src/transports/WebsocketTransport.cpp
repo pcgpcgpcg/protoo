@@ -130,6 +130,10 @@ WebSocketTransport::~WebSocketTransport()
         delete m_pWsThread;
         m_pWsThread = nullptr;
     }
+    if(m_context){
+        lws_context_destroy(m_context);
+        m_context = nullptr;
+    }
 }
 
 bool WebSocketTransport::closed() {
@@ -210,6 +214,7 @@ void WebSocketTransport::runWebSocket() {
         ccinfo.path = m_path.c_str();
         ccinfo.origin = m_url.c_str();
         ccinfo.protocol = m_protocols[0].name;
+
         ccinfo.userdata = this;
         m_wsClient = lws_client_connect_via_info(&ccinfo);
         while(!m_stopped && m_wsClient){
@@ -221,6 +226,29 @@ void WebSocketTransport::runWebSocket() {
         std::cout<<"websocket thread exit"<<std::endl;
     });
 }
+
+    void WebSocketTransport::scheduleTask(int afterMs, std::function<void()> task) {
+        if (!m_context) {
+            std::cerr << "Cannot schedule task: LWS context not created." << std::endl;
+            return;
+        }
+
+        // Time conversion to microseconds
+        lws_usec_t delay = afterMs * LWS_US_PER_MS;
+
+        // Save task to be called by the static callback
+        m_task = task;
+        // Setup the callback function to be called after the delay
+        lws_sul_schedule(m_context, 0, &m_sul, [](lws_sorted_usec_list_t* sul) {
+            // 执行任务
+            // Retrieve the WebSocketTransport instance from the sul
+            WebSocketTransport* self = lws_container_of(sul, WebSocketTransport, m_sul);
+            // Execute the saved task
+            if (self->m_task) {
+                self->m_task();
+            }
+        }, delay);
+    }
 
 void WebSocketTransport::handleMessages(std::string message) {
 	auto jmsg = protoo::Message::parse(message);

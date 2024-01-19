@@ -57,7 +57,13 @@ namespace protoo {
 
 	std::future<json> Peer::request(string method, json data) {
 		auto request = Message::createRequest(method, data);
+		auto id = request["id"].get<int>();
 		std::cout << "[Peer] send a new request id=:" << request["id"].get<int>() << " method=" << method << endl;
+		auto promise = std::make_shared<std::promise<json>>();
+		auto future = promise->get_future();
+		//存储promise 并计划一个超时任务
+		m_promises[id] = promise;
+		
 
 	}
 
