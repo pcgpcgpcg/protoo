@@ -49,6 +49,7 @@ private:
 
 public:
     void scheduleTask(int afterMs, std::function<void()> task); 
+    void cancelScheduledTask();
     void handleMessages(std::string message);
 
 private:

@@ -250,6 +250,17 @@ void WebSocketTransport::runWebSocket() {
         }, delay);
     }
 
+    // 新的方法：取消定时任务
+    void WebSocketTransport::cancelScheduledTask() {
+        if (!m_context) {
+            std::cerr << "Cannot cancel scheduled task: LWS context not created." << std::endl;
+            return;
+        }
+
+        // 使用 lws_sul_cancel 来取消定时任务
+        lws_sul_cancel(&m_sul);
+    }
+
 void WebSocketTransport::handleMessages(std::string message) {
 	auto jmsg = protoo::Message::parse(message);
 	m_listener->onMessage(jmsg);

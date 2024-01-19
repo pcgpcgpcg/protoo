@@ -47,8 +47,8 @@ message(STATUS PROJECT_NAME = ${PROJECT_NAME})
  message(STATUS CMAKE_CURRENT_SOURCE_DIR = ${CMAKE_CURRENT_SOURCE_DIR})
  message(STATUS CMAKE_CURRENT_LIST_DIR = ${CMAKE_CURRENT_LIST_DIR})
 
-FILE(GLOB_RECURSE all_source_files "client/src/*.cpp", "main.cpp")
-FILE(GLOB_RECURSE all_head_files "client/include/*.h")
+FILE(GLOB_RECURSE all_source_files "client/src/*.cpp", "main.cpp", "qrtm.cpp")
+FILE(GLOB_RECURSE all_head_files "client/include/*.h", "qrtm.h")
 
 add_executable(
             ${PROJECT_NAME} 
