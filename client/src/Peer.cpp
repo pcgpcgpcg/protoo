@@ -67,6 +67,38 @@ namespace protoo {
 
 	}
 
+// 	   std::future<std::string> request(const std::string& method, const std::string& data = "") {
+//         Message request = Message::createRequest(method, data);
+//         // this->_logger.debug...
+
+//         // 发送消息
+//         transport->send(request.toString()); // 假设 Message 类有 toString 方法来序列化数据
+
+//         // 创建 promise 和 future
+//         auto promise = std::make_shared<std::promise<std::string>>();
+//         auto future = promise->get_future();
+
+//         // 存储 promise，并计划一个超时任务
+//         promises[request.id] = promise;
+
+//         // 超时配置
+//         const int timeout_ms = ...;
+
+//         // 使用 lws_sorted_usec_list_t 结构和 transport 的 scheduleTimeout 方法来计划超时任务
+//         lws_sorted_usec_list_t sul;
+//         transport->scheduleTimeout(&sul, [this, request_id=request.id]() {
+//             auto it = promises.find(request_id);
+//             if (it != promises.end()) {
+//                 it->second->set_exception(std::make_exception_ptr(std::runtime_error("request timeout")));
+//                 promises.erase(it);
+//             }
+//         }, timeout_ms);
+
+//         return future;
+//     }
+// };
+
+
 	void Peer::notify(string method, json data) {
 		auto request = Message::createNotification(method, data);
 		//this->m_pTransport->send(request);
