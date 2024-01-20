@@ -184,7 +184,7 @@ class RTM {
         std::future<LogoutResponse> logout();
         std::future<SubscribeResponse> subscribe(const std::string& channelName);
         std::future<UnsubscribeResponse> unsubscribe(const std::string& channelName);
-        std::future<PublishResponse> publish(const std::string& channelName, const std::string& message);
+        void publish(const std::string& channelName, const std::string& message);
     private:
     std::unique_ptr<protoo::Peer> m_pPeer;
         std::string m_appId;
