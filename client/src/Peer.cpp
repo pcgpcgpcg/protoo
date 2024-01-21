@@ -50,7 +50,7 @@ namespace protoo {
 	std::future<json> Peer::request(string method, json data) {
 		auto request = Message::createRequest(method, data);
 		auto id = request["id"].get<int>();
-		std::cout << "[Peer] send a new request id=:" << request["id"].get<int>() << " method=" << method << endl;
+		std::cout << "[Peer] send a new request id=" << request["id"].get<int>() << " method=" << method << endl;
 		auto promise = std::make_shared<std::promise<json>>();
 		//std::promise<json> promise;
 		//m_promises[id] = std::make_shared<std::promise<json>>(std::move(promise));

@@ -151,28 +151,12 @@ class RTM;
 
 class RTMListener {
 public:
-    std::function<void(RTM&, const std::string&, const std::string&, const std::string&)> onReceiveMessage;
-    std::function<void(RTM&, const std::string&, const QRtmPresenceEvent&)> onReceivePresence;
-    std::function<void()> onConnected;
-    std::function<void()> onDisconnected;
-    std::function<void()> onReconnecting;
-    std::function<void()> onReconnected;
-    // Uncomment these lines if you implement RTM and QRtmPresenceEvent elsewhere.
-    // std::function<void(RTM&)> onTokenDidExpire;
-    // std::function<void(RTM&, ConnectState, const std::string&)> onConnectionStateChanged;
-
-    // Example usage:
-    // RTMListener listener;
-    // listener.onReceiveMessage = [](RTM& rtm, const std::string& message, const std::string& fromChannel, const std::string& fromPeer) {
-    //     // Handle the incoming message
-    // };
-    // listener.onReceivePresence = [](RTM& rtm, const std::string& userId, const QRtmPresenceEvent& presentEvent) {
-    //     // Handle the presence event
-    // };
-    // listener.onConnected = []() {
-    //     // Handle the connected event
-    // };
-    // ... and so on for the other handlers
+    virtual void onReceiveMessage(RTM*, const std::string&, const std::string&, const std::string&) = 0;
+    virtual void onReceivePresence(RTM*, const std::string&, const QRtmPresenceEvent&) = 0;
+    virtual void onConnected() = 0;
+    virtual void onDisconnected() = 0;
+    virtual void onReconnecting() = 0;
+    virtual void onReconnected() = 0;
 };
 
 class RTM {

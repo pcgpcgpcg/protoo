@@ -99,7 +99,6 @@ namespace protoo {
 		onPeerFailedCB onPeerFailed;
 		onServerRequestCB onServerRequest;
 		onServerNotificationCB onServerNotification;
-
 	};
 
 }

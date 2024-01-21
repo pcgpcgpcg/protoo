@@ -4,6 +4,7 @@
 #include "Peer.h"
 #include <memory>
 #include "uv.h"
+#include "qrtm.h"
 // #ifdef __cplusplus
 // extern "C" {
 // #endif
@@ -13,25 +14,26 @@
 // }
 // #endif
 
-class MyTransportListener : public WebSocketTransport::TransportListener
+class MyRTMListener : public RTMListener
 {
 public:
-    MyTransportListener() {}
-    ~MyTransportListener() {}
+    MyRTMListener() {}
+    ~MyRTMListener() {}
 
-    void onOpen() override
+    void onReceiveMessage(RTM*, const std::string&, const std::string&, const std::string&) override
+    {
+        //连接上之后，接收消息
+    }
+
+    void onReceivePresence(RTM*, const std::string&, const QRtmPresenceEvent&) override
     {
         // Your implementation here
     }
 
-    void onClosed() override
+    void onConnected() override
     {
-        // Your implementation here
-    }
-
-    void onMessage(json message) override
-    {
-        // Your implementation here
+        //连接上之后，登陆 登陆频道 发送消息
+        std::cout << "[MAIN] RTM::onConnected" << std::endl;
     }
 
     void onDisconnected() override
@@ -39,7 +41,12 @@ public:
         // Your implementation here
     }
 
-    void onFailed() override
+    void onReconnecting() override
+    {
+        // Your implementation here
+    }
+
+    void onReconnected() override
     {
         // Your implementation here
     }
@@ -53,7 +60,21 @@ void sigint_handler(int sig)
 int main(int argc, char *argv[]){
     signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
-    std::unique_ptr<protoo::Peer> peer(new protoo::Peer("ws://152.136.16.141:8080/websocket"));
+    //需要创建一个线程，在线程里去处理rtm的连接
+
+    MyRTMListener listener;
+    std::unique_ptr<RTM> rtm(new RTM("appId", "user123456", RTMConfig(), &listener));
+    try{
+        //打印当前线程id
+        std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
+        rtm->login().get();
+        rtm->subscribe("notification").get();
+        rtm->publish("notification", "hello world");
+    }catch(const std::exception &e){
+        std::cout << "login error" << std::endl;
+    }
+
+    //std::unique_ptr<protoo::Peer> peer(new protoo::Peer("ws://152.136.16.141:8080/websocket"));
     // MyTransportListener listener;
     // auto transport = new WebSocketTransport("ws://152.136.16.141:8080/websocket", &listener);
     // listener.onOpen();

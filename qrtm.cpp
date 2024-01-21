@@ -15,12 +15,35 @@ RTM::~RTM(){
 
 std::future<LoginResponse> RTM::login(){
     //先建立websocket链接
-    m_pPeer.reset(new protoo::Peer(m_config.serverUrl.value_or("wss://superrtc.com/websocket")));
+    std::string defaultUrl = "ws://49.232.122.245:8002/?roomId=&peerId="+m_userId;
+    std::string defaultUrl2 = "ws://152.136.16.141:8080/?roomId=&peerId="+m_userId;
+    m_pPeer.reset(new protoo::Peer(m_config.serverUrl.value_or(defaultUrl)));
+    m_pPeer->onServerNotification = [this](const json &data) {
+        std::cout << "[RTM] Peer::onReceiveNotification" << std::endl;
+        //解析method
+        auto method = data["method"].get<std::string>();
+         auto msgData = data["data"];
+         auto channelId = msgData["channelId"].get<std::string>();
+        auto peerId = msgData["peerId"].get<std::string>();
+        if(method == "channelMsgText"){
+//解析接收到的json,解析到channelId, peerId和msg
+                auto msg = msgData["msg"].get<std::string>();
+                m_pListener->onReceiveMessage(this, channelId, peerId, msg);
+        }else if(method == "memberJoin"){
+            m_pListener->onReceivePresence(this, channelId, {QRTMPresenceEventType::RemoteJoinChannel, channelId, peerId});
+
+        }else if(method == "memberLeave"){
+           m_pListener->onReceivePresence(this, channelId, {QRTMPresenceEventType::RemoteLeaveChannel, channelId, peerId});
+        }else{
+
+        }
+    };
     //定义promise
     auto promise = std::make_shared<std::promise<LoginResponse>>();
     //连接成功
-    m_pPeer->onPeerOpen = [this, &promise]() {
+    m_pPeer->onPeerOpen = [this, promise]() {
         std::cout << "[RTM] Peer::onPeerOpen" << std::endl;
+        
         //发送login请求
         try {
             json requestData = {
@@ -30,6 +53,8 @@ std::future<LoginResponse> RTM::login(){
 		  {"appId", m_appId}
 		};
             auto retJson = m_pPeer->request("login", requestData).get();
+            std::cout<<"[RTM] login response: "<<retJson.dump()<<std::endl;
+            m_pListener->onConnected();
             promise->set_value({0});    
         } catch (const std::exception &e){
             std::cout << "[RTM] Peer::onPeerOpen error" << std::endl;
@@ -38,15 +63,17 @@ std::future<LoginResponse> RTM::login(){
     //连接失败
     m_pPeer->onPeerClosed = [this]() {
         std::cout << "[RTM] Peer::onPeerClosed" << std::endl;
+        //m_pListener->onClosed();
         //TODO
     };
     //连接断开
     m_pPeer->onPeerDisconnected = [this]() {
         std::cout << "[RTM] Peer::onPeerDisconnected" << std::endl;
+        m_pListener->onDisconnected();
         //TODO
     };
     //连接失败
-    m_pPeer->onPeerFailed = [this, &promise]() {
+    m_pPeer->onPeerFailed = [this, promise]() {
         std::cout << "[RTM] Peer::onPeerFailed" << std::endl;
         //TODO
         promise->set_exception(std::make_exception_ptr(std::runtime_error("request timeout")));

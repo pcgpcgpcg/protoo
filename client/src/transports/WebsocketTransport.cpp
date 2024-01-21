@@ -154,6 +154,8 @@ void WebSocketTransport::send(json message)
 	m_msgQueue.push(msg);
     m_noMsg = false;
     if(m_wsClient){
+        //打印一下当前线程信息
+        std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
         lws_callback_on_writable(m_wsClient);
     }
 }
@@ -181,6 +183,8 @@ uint32_t GetCurrentThreadId() {
 void WebSocketTransport::runWebSocket() {
     //开启一个新的线程，用于websocket连接
     m_pWsThread = new std::thread([&]() { 
+        //打印一下当前线程id
+        std::cout << "[WebSocketTransport] websocket thread id=" << std::this_thread::get_id() << std::endl;
         lws_context_creation_info info;
         memset(&info, 0, sizeof(info));
         info.port = CONTEXT_PORT_NO_LISTEN;
