@@ -54,8 +54,14 @@ int main(int argc, char *argv[]){
     signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
     std::unique_ptr<protoo::Peer> peer(new protoo::Peer("ws://152.136.16.141:8080/websocket"));
-    // MyTransportListener listener;
-    // auto transport = new WebSocketTransport("ws://152.136.16.141:8080/websocket", &listener);
+    MyTransportListener listener;
+    auto transport = new WebSocketTransport("ws://152.136.16.141:8080/websocket", &listener);
+
+    nlohmann::json j;
+j["viturlRule"] = "888#";
+std::string data = j.dump();
+
+    transport->sendPostRequest("http://192.168.31.16:8200/rules/search", data);
     // listener.onOpen();
     // transport->send(json::parse("{\"type\":\"login\",\"data\":{\"username\":\"test\",\"password\":\"test\"}}"));
     while(true){

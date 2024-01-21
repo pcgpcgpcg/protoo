@@ -13,9 +13,14 @@ endif()
 if(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
         message(STATUS "Current system is macOS")
-        set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2)
-        set(OPENSSL_DIR /usr/local/Cellar/openssl@1.1/1.1.1t)
-        set(LIBUV_DIR /usr/local/Cellar/libuv/1.44.2)
+        # set(LIBWEBSOCKETS_DIR /usr/local/Cellar/libwebsockets/4.3.2)
+        set(LIBWEBSOCKETS_DIR /usr/local/lib)
+        # set(OPENSSL_DIR /usr/local/Cellar/openssl@1.1/1.1.1t)
+        set(OPENSSL_DIR /usr/local/ssl)
+
+        set(LIBUV_DIR /usr/local/lib/)
+        include_directories(${LIBUV_DIR}include)
+        # find_package(Libwebsockets REQUIRED)
     endif()
 endif()
 
@@ -63,9 +68,15 @@ target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/clie
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUV_DIR}/include)
-
-target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a 
-                                      ${OPENSSL_DIR}/lib/libssl.a 
-                                      ${OPENSSL_DIR}/lib/libcrypto.a
-                                      ${LIBUV_DIR}/lib/libuv.a
+ 
+target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/libwebsockets.a 
+                                      ${OPENSSL_DIR}/../lib/libssl.a 
+                                      ${OPENSSL_DIR}/../lib/libcrypto.a
+                                      ${LIBUV_DIR}/libuv.a
                      )
+
+                     find_package(Libwebsockets REQUIRED)
+                     target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_INCLUDE_DIRS})                
+
+                    #  find_package(Libuv REQUIRED)
+                    #  target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUV_INCLUDE_DIRS})    

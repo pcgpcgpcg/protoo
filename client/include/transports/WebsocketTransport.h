@@ -11,6 +11,7 @@
 #ifdef __cplusplus
 extern "C"{
 #include "libwebsockets.h"
+// #include <libwebsockets.h>
 #endif
 #ifdef __cplusplus
 }
@@ -43,7 +44,7 @@ public:
     void close();
     void sendSync(json message);
     void send(json message);
-
+    void  sendPostRequest(const std::string& url, const std::string& data);
 private:
     void runWebSocket();
 

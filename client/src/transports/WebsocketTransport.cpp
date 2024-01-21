@@ -1,6 +1,7 @@
 #include "WebSocketTransport.h"
 #include "Message.h"
 #include <regex>
+#include <curl/curl.h>
 //#include <cpprest/asyncrt_utils.h>
 //using namespace std;
 //using namespace nlohmann;
@@ -117,7 +118,21 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
     //lauch websocket connection
 	runWebSocket();
 }
-
+void WebSocketTransport::sendPostRequest(const std::string& url, const std::string& data)
+{
+    CURL *curl = curl_easy_init();
+    if(curl) {
+        CURLcode res;
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+        curl_easy_setopt(curl, CURLOPT_POSTFIELDS, data.c_str());
+        struct curl_slist *headers = NULL;
+        headers = curl_slist_append(headers, "Content-Type: application/json");
+        curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+        if(res != CURLE_OK)
+            fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
+        curl_easy_cleanup(curl);
+    }
+}
 WebSocketTransport::~WebSocketTransport()
 {
     m_stopped = true;
