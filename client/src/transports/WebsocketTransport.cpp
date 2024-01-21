@@ -7,6 +7,9 @@
 //constructor
 #define TRANSPORT_LOG_ENABLE 1
 
+std::condition_variable g_cvOnOpen;
+    std::mutex g_mtx;
+
 WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) {
    std::regex ex("(ws|wss)://([^/ :]+):?([^/ ]*)(/?[^ #]*)");
     std::cmatch what;
@@ -54,7 +57,8 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
             {
             case LWS_CALLBACK_CLIENT_ESTABLISHED:
                 std::cout << "websocket connected" << std::endl;
-                pSelf->m_listener->onOpen();
+                //pSelf->m_listener->onOpen();
+                g_cvOnOpen.notify_one();
                 break;
             case LWS_CALLBACK_CLIENT_RECEIVE:
                 if (len > 0)
@@ -116,6 +120,12 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
          m_protocols[1] = {nullptr, nullptr, 0, 0};
     //lauch websocket connection
 	runWebSocket();
+    //等待连接成功的消息
+    std::unique_lock<std::mutex> lk(g_mtx);
+    g_cvOnOpen.wait(lk);
+    //接收到了信号，说明连接成功了 TODO:此处需要加个超时机制
+    int a= 1;
+    a++;
 }
 
 WebSocketTransport::~WebSocketTransport()

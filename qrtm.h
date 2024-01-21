@@ -164,7 +164,7 @@ class RTM {
         RTM(std::string appId, std::string userId, const RTMConfig& config, RTMListener* listener);
         ~RTM();
     public:
-        std::future<LoginResponse> login();
+        int login();
         std::future<LogoutResponse> logout();
         std::future<SubscribeResponse> subscribe(const std::string& channelName);
         std::future<UnsubscribeResponse> unsubscribe(const std::string& channelName);

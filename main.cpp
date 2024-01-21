@@ -67,7 +67,7 @@ int main(int argc, char *argv[]){
     try{
         //打印当前线程id
         std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
-        rtm->login().get();
+        rtm->login();
         rtm->subscribe("notification").get();
         rtm->publish("notification", "hello world");
     }catch(const std::exception &e){
