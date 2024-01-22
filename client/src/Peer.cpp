@@ -56,7 +56,7 @@ namespace protoo {
 		//m_promises[id] = std::make_shared<std::promise<json>>(std::move(promise));
 		auto future = promise->get_future();
 		m_promises[id] = promise;
-		int timeout_ms = 1500 * (15 + (0.1 * m_promises.size()));
+		int timeout_ms = 15000 * (15 + (0.1 * m_promises.size()));
 		//设置计划任务，用于处理超时
 		m_pTransport->scheduleTask(timeout_ms, [this, id]() {
 			auto it = m_promises.find(id);

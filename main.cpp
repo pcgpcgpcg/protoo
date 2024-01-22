@@ -1,6 +1,7 @@
 #include <iostream>
 #include "Message.h"
 #include "WebSocketTransport.h"
+#include "HTTPTransport.h"
 #include "Peer.h"
 #include <memory>
 #include "uv.h"
@@ -60,19 +61,28 @@ void sigint_handler(int sig)
 int main(int argc, char *argv[]){
     signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
-    //需要创建一个线程，在线程里去处理rtm的连接
 
     MyRTMListener listener;
-    std::unique_ptr<RTM> rtm(new RTM("appId", "user123456", RTMConfig(), &listener));
+    std::unique_ptr<RTM> rtm(new RTM("appId", "user1234567", RTMConfig(), &listener));
     try{
         //打印当前线程id
         std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
-        rtm->login();
+        rtm->login().get();
         rtm->subscribe("notification").get();
         rtm->publish("notification", "hello world");
-    }catch(const std::exception &e){
+        }catch(const std::exception &e){
         std::cout << "login error" << std::endl;
     }
+        
+    //     //进行http post请求
+    // auto transport = new HTTPTransport();
+    // //请求呼叫规则列表
+    // transport->sendPostRequest(std::string("http://192.168.31.16:8200"),"/rules/list", "");
+    // //根据某个虚拟号码规则，获取相关用户
+    // transport->sendPostRequest(std::string("http://192.168.31.16:8200"),"/rules/search", "");
+    // }catch(const std::exception &e){
+    //     std::cout << "login error" << std::endl;
+    // }
 
     //std::unique_ptr<protoo::Peer> peer(new protoo::Peer("ws://152.136.16.141:8080/websocket"));
     // MyTransportListener listener;

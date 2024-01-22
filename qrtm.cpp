@@ -13,7 +13,7 @@ RTM::~RTM(){
 
 }
 
-int RTM::login(){
+std::future<LoginResponse> RTM::login(){
     //先建立websocket链接
     std::string defaultUrl = "ws://49.232.122.245:8002/?roomId=&peerId="+m_userId;
     std::string defaultUrl2 = "ws://152.136.16.141:8080/?roomId=&peerId="+m_userId;
@@ -39,23 +39,27 @@ int RTM::login(){
         }
     };
     //定义promise
-    //auto promise = std::make_shared<std::promise<LoginResponse>>();
+    auto promise = std::make_shared<std::promise<LoginResponse>>();
     // 发送login请求
     try
     {
         json requestData = {
             {"displayName", "pc"},
-            {"device", "pc"},
+            {"device",{
+                {"name", "pc"},
+                {"version", "1.0.0"}
+            }},
             {"accessToken", this->m_config.token.value_or("")},
             {"appId", m_appId}};
         auto retJson = m_pPeer->request("login", requestData).get();
         std::cout << "[RTM] login response: " << retJson.dump() << std::endl;
         m_pListener->onConnected();
-        //promise->set_value({0});
+        promise->set_value({0});
     }
     catch (const std::exception &e)
     {
         std::cout << "[RTM] Peer::onPeerOpen error" << std::endl;
+        promise->set_exception(std::make_exception_ptr(std::runtime_error("request timeout")));
     }
     //连接成功
     m_pPeer->onPeerOpen = [this]() {
@@ -74,10 +78,10 @@ int RTM::login(){
         //TODO
     };
     //连接失败
-    m_pPeer->onPeerFailed = [this]() {
+    m_pPeer->onPeerFailed = [this, promise]() {
         std::cout << "[RTM] Peer::onPeerFailed" << std::endl;
         //TODO
-        //promise->set_exception(std::make_exception_ptr(std::runtime_error("request timeout")));
+        promise->set_exception(std::make_exception_ptr(std::runtime_error("request timeout")));
     };
     //收到notification
     m_pPeer->onServerNotification = [this](const json &data) {
@@ -89,8 +93,8 @@ int RTM::login(){
         std::cout << "[RTM] Peer::onReceiveRequest" << std::endl;
         //TODO
     };
-    return 1;
-    //return promise->get_future();
+
+    return promise->get_future();
 }
 
 std::future<LogoutResponse> RTM::logout(){

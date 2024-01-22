@@ -58,6 +58,10 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
             case LWS_CALLBACK_CLIENT_ESTABLISHED:
                 std::cout << "websocket connected" << std::endl;
                 //pSelf->m_listener->onOpen();
+                {
+                std::unique_lock<std::mutex> lk2(g_mtx);
+                
+                }
                 g_cvOnOpen.notify_one();
                 break;
             case LWS_CALLBACK_CLIENT_RECEIVE:
@@ -67,9 +71,9 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
                     if (lws_is_final_fragment(wsi))
                     {
                         std::cout<<"received message:"<<pSelf->m_receivedMsg<<std::endl;
-                        // auto jmsg = protoo::Message::parse(pSelf->m_receivedMsg);
-                        // pSelf->m_listener->onMessage(jmsg);
-                        // pSelf->m_receivedMsg.clear();
+                        auto jmsg = protoo::Message::parse(pSelf->m_receivedMsg);
+                        pSelf->m_listener->onMessage(jmsg);
+                        pSelf->m_receivedMsg.clear();
                     }
                 }
                 break;
@@ -163,11 +167,11 @@ void WebSocketTransport::send(json message)
     auto msg = message.dump();
 	m_msgQueue.push(msg);
     m_noMsg = false;
-    if(m_wsClient){
-        //打印一下当前线程信息
-        std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
-        lws_callback_on_writable(m_wsClient);
-    }
+    // if(m_wsClient){
+    //     //打印一下当前线程信息
+    //     std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
+    //     lws_callback_on_writable(m_wsClient);
+    // }
 }
 #ifdef _WIN32
 
@@ -232,8 +236,18 @@ void WebSocketTransport::runWebSocket() {
         ccinfo.userdata = this;
         m_wsClient = lws_client_connect_via_info(&ccinfo);
         while(!m_stopped && m_wsClient){
+            //此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
+            if (!m_msgQueue.empty())
+            {
+                if (m_wsClient)
+                {
+                    // 打印一下当前线程信息
+                    std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
+                    lws_callback_on_writable(m_wsClient);
+                }
+            }
             //此处需研究实现重连机制
-            lws_service(m_context, 50);
+            lws_service(m_context, 0);
         }
         lws_context_destroy(m_context);
         m_wsClient = nullptr;
