@@ -58,12 +58,13 @@ int main(int argc, char *argv[]){
     auto transport = new WebSocketTransport("ws://152.136.16.141:8080/websocket", &listener);
 
     nlohmann::json j;
-j["viturlRule"] = "888#";
-std::string data = j.dump();
+    j["viturlRule"] = "888#";
+    std::string data = j.dump();
 
-    transport->sendPostRequest("http://192.168.31.16:8200/rules/search", data);
-    // listener.onOpen();
-    // transport->send(json::parse("{\"type\":\"login\",\"data\":{\"username\":\"test\",\"password\":\"test\"}}"));
+  
+      listener.onOpen();
+     transport->send(json::parse("{\"type\":\"login\",\"data\":{\"username\":\"test\",\"password\":\"test\"}}"));
+      transport->sendPostRequest("http://192.168.31.16:8200/rules/search", data);
     while(true){
         std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     }

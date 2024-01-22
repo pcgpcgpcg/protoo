@@ -2,6 +2,8 @@
 #include "Message.h"
 #include <regex>
 #include <curl/curl.h>
+// #include <cpprest/http_client.h>
+// #include <cpprest/filestream.h>
 //#include <cpprest/asyncrt_utils.h>
 //using namespace std;
 //using namespace nlohmann;
@@ -128,6 +130,7 @@ void WebSocketTransport::sendPostRequest(const std::string& url, const std::stri
         struct curl_slist *headers = NULL;
         headers = curl_slist_append(headers, "Content-Type: application/json");
         curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+          res = curl_easy_perform(curl); 
         if(res != CURLE_OK)
             fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
         curl_easy_cleanup(curl);

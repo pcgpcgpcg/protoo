@@ -80,3 +80,6 @@ target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/libwebsockets.a
 
                     #  find_package(Libuv REQUIRED)
                     #  target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUV_INCLUDE_DIRS})    
+                    find_package(CURL REQUIRED)
+include_directories(${CURL_INCLUDE_DIRS})
+target_link_libraries(${PROJECT_NAME} ${CURL_LIBRARIES})
