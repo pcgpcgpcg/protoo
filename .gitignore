@@ -10,3 +10,4 @@ compile_commands.json
 CTestTestfile.cmake
 _deps
 \build
+thirdparty/libwebsockets-4.3.3/

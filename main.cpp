@@ -1,6 +1,6 @@
 #include <iostream>
 #include "Message.h"
-#include "WebSocketTransport.h"
+#include "WebsocketTransport.h"
 #include "HTTPTransport.h"
 #include "Peer.h"
 #include <memory>
@@ -59,7 +59,7 @@ void sigint_handler(int sig)
 }
 
 int main(int argc, char *argv[]){
-    signal(SIGINT, sigint_handler);
+    //signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
 
     MyRTMListener listener;

@@ -8,6 +8,9 @@ set(CMAKE_CXX_STANDARD 17)
 
 if(WIN32)
     message(STATUS "Current system is Windows")
+    set(LIBWEBSOCKETS_DIR ${CMAKE_CURRENT_LIST_DIR}/thirdparty/libwebsockets)
+    set(OPENSSL_DIR ${CMAKE_CURRENT_LIST_DIR}/thirdparty/OpenSSL-Win64)
+    # set(LIBUV_DIR /usr/local/Cellar/libuv/1.47.0)
 endif()
 
 if(APPLE)
@@ -56,6 +59,8 @@ add_executable(
             ${all_source_files}
 )
 
+message(STATUS "Include path: ${CMAKE_CURRENT_LIST_DIR}/client/include/transports")
+
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/thirdparty/nlohmann)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include/transports)
@@ -64,8 +69,22 @@ target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBUV_DIR}/include)
 
+if(APPLE)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+        message(STATUS "Current system is macOS")
 target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a 
                                       ${OPENSSL_DIR}/lib/libssl.a 
                                       ${OPENSSL_DIR}/lib/libcrypto.a
                                       ${LIBUV_DIR}/lib/libuv.a
                      )
+    endif()
+endif()
+
+if(WIN32)
+    message(STATUS "Current system is Windows")
+    target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/debug/websockets.lib 
+    ${OPENSSL_DIR}/lib/libssl.lib 
+    ${OPENSSL_DIR}/lib/libcrypto.lib
+    # ${LIBUV_DIR}/lib/libuv.a
+)
+endif()
