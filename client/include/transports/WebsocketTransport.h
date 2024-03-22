@@ -8,6 +8,7 @@
 #include <iostream>
 #include <memory>
 #include <queue>
+#include "MessageQueue.h"
 #ifdef __cplusplus
 extern "C"{
 #include "libwebsockets.h"
@@ -48,7 +49,8 @@ private:
     void runWebSocket();
 
 public:
-    void scheduleTask(int afterMs, std::function<void()> task); 
+    void InvokeTask(std::function<void()> task);
+    void scheduleTask(int afterMs, std::function<void()> task);
     void cancelScheduledTask();
     void handleMessages(std::string message);
 
@@ -80,6 +82,10 @@ private:
     TransportListener *m_listener{nullptr};
     std::function<void()> m_task;
     lws_sorted_usec_list_t m_sul;
+    //MessageQueue m_messageQueue;
+    // 线程安全的任务队列
+    std::queue<std::function<void()>> tasks;
+    std::mutex tasks_mutex;
 };
 
 #endif

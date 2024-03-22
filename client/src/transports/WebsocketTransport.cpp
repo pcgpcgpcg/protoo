@@ -11,6 +11,8 @@ std::condition_variable g_cvOnOpen;
     std::mutex g_mtx;
 
 WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) {
+    memset(&m_sul, 0, sizeof(m_sul));
+
    std::regex ex("(ws|wss)://([^/ :]+):?([^/ ]*)(/?[^ #]*)");
     std::cmatch what;
     if (regex_match(url.c_str(), what, ex))
@@ -164,15 +166,26 @@ void WebSocketTransport::close() {
 
 void WebSocketTransport::send(json message)
 {
-    auto msg = message.dump();
-	m_msgQueue.push(msg);
-    m_noMsg = false;
-    // if(m_wsClient){
-    //     //打印一下当前线程信息
-    //     std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
-    //     lws_callback_on_writable(m_wsClient);
-    // }
+    this->InvokeTask([this, message](){
+         auto msg = message.dump();
+	     m_msgQueue.push(msg);
+         m_noMsg = false;
+         if (m_wsClient)
+         {
+             lws_callback_on_writable(m_wsClient);
+         } 
+     });
 }
+
+void WebSocketTransport::InvokeTask(std::function<void()> task)
+{
+    {
+        std::lock_guard<std::mutex> lock(tasks_mutex);
+        tasks.push(task);
+    }
+    lws_cancel_service(m_context); // 假设`context`是线程A中的lws_context
+}
+
 #ifdef _WIN32
 
 #elif defined __linux__
@@ -235,8 +248,9 @@ void WebSocketTransport::runWebSocket() {
 
         ccinfo.userdata = this;
         m_wsClient = lws_client_connect_via_info(&ccinfo);
-        while(!m_stopped && m_wsClient){
-            //此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
+        while (!m_stopped && m_wsClient)
+        {
+            // 此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
             if (!m_msgQueue.empty())
             {
                 if (m_wsClient)
@@ -246,8 +260,25 @@ void WebSocketTransport::runWebSocket() {
                     lws_callback_on_writable(m_wsClient);
                 }
             }
-            //此处需研究实现重连机制
+            // 此处需研究实现重连机制
             lws_service(m_context, 0);
+            // 处理所有调度的任务
+            while (!tasks.empty())
+            {
+                std::function<void()> task;
+                {
+                    std::lock_guard<std::mutex> lock(tasks_mutex);
+                    if (!tasks.empty())
+                    {
+                        task = tasks.front();
+                        tasks.pop();
+                    }
+                }
+                if (task)
+                {
+                    task(); // 在线程A的上下文中执行任务
+                }
+            }
         }
         lws_context_destroy(m_context);
         m_wsClient = nullptr;
@@ -255,39 +286,43 @@ void WebSocketTransport::runWebSocket() {
     });
 }
 
-    void WebSocketTransport::scheduleTask(int afterMs, std::function<void()> task) {
-        if (!m_context) {
-            std::cerr << "Cannot schedule task: LWS context not created." << std::endl;
-            return;
-        }
-
-        // Time conversion to microseconds
-        lws_usec_t delay = afterMs * LWS_US_PER_MS;
-
-        // Save task to be called by the static callback
-        m_task = task;
-        // Setup the callback function to be called after the delay
-        lws_sul_schedule(m_context, 0, &m_sul, [](lws_sorted_usec_list_t* sul) {
-            // 执行任务
-            // Retrieve the WebSocketTransport instance from the sul
-            WebSocketTransport* self = lws_container_of(sul, WebSocketTransport, m_sul);
-            // Execute the saved task
-            if (self->m_task) {
-                self->m_task();
+void WebSocketTransport::scheduleTask(int afterMs, std::function<void()> task)
+{
+    InvokeTask([this, afterMs, task]()
+               {
+            if (!m_context) {
+                std::cerr << "Cannot schedule task: LWS context not created." << std::endl;
+                return;
             }
-        }, delay);
-    }
 
-    // 新的方法：取消定时任务
-    void WebSocketTransport::cancelScheduledTask() {
-        if (!m_context) {
-            std::cerr << "Cannot cancel scheduled task: LWS context not created." << std::endl;
-            return;
-        }
+            // Time conversion to microseconds
+            lws_usec_t delay = afterMs * LWS_US_PER_MS;
 
-        // 使用 lws_sul_cancel 来取消定时任务
-        lws_sul_cancel(&m_sul);
-    }
+            // Save task to be called by the static callback
+            m_task = task;
+            // Setup the callback function to be called after the delay
+            lws_sul_schedule(m_context, 0, &m_sul, [](lws_sorted_usec_list_t* sul) {
+                // Retrieve the WebSocketTransport instance from the sul
+                WebSocketTransport* self = lws_container_of(sul, WebSocketTransport, m_sul);
+                // Execute the saved task
+                if (self->m_task) {
+                    self->m_task();
+                }
+            }, delay); });
+}
+
+void WebSocketTransport::cancelScheduledTask()
+{
+    InvokeTask([this]()
+               {
+            if (!m_context) {
+                std::cerr << "Cannot cancel scheduled task: LWS context not created." << std::endl;
+                return;
+            }
+
+            // 使用 lws_sul_cancel 来取消定时任务
+            lws_sul_cancel(&m_sul); });
+}
 
 void WebSocketTransport::handleMessages(std::string message) {
 	auto jmsg = protoo::Message::parse(message);

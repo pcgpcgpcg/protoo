@@ -4,7 +4,7 @@
 #include "HTTPTransport.h"
 #include "Peer.h"
 #include <memory>
-#include "uv.h"
+//#include "uv.h"
 #include "qrtm.h"
 // #ifdef __cplusplus
 // extern "C" {

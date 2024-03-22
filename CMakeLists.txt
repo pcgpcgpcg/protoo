@@ -64,6 +64,7 @@ message(STATUS "Include path: ${CMAKE_CURRENT_LIST_DIR}/client/include/transport
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/thirdparty/nlohmann)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include)
 target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include/transports)
+target_include_directories(${PROJECT_NAME} PUBLIC ${CMAKE_CURRENT_LIST_DIR}/client/include/utils)
 
 target_include_directories(${PROJECT_NAME} PRIVATE ${LIBWEBSOCKETS_DIR}/include)
 target_include_directories(${PROJECT_NAME} PRIVATE ${OPENSSL_DIR}/include)
