@@ -10,8 +10,84 @@
 std::condition_variable g_cvOnOpen;
     std::mutex g_mtx;
 
+    static const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 4000 };
+
+    static const lws_retry_bo_t retry = {
+        .retry_ms_table = backoff_ms,
+        .retry_ms_table_count = LWS_ARRAY_SIZE(backoff_ms),
+         //If you set retry.conceal_count to be LWS_RETRY_CONCEAL_ALWAYS, it will never give up and keep retrying at the last backoff
+        .conceal_count = LWS_RETRY_CONCEAL_ALWAYS , //endless try
+
+        .secs_since_valid_ping = 3,  /* force PINGs after secs idle */
+        .secs_since_valid_hangup = 10, /* hangup after secs idle */
+
+        .jitter_percent = 20,
+    };
+
+ //   static const uint32_t _rbo_bo_0[] = {
+ //1000,  2000,  3000,  5000,  10000,
+ //   };
+ //   static const lws_retry_bo_t _rbo_0 = {
+ //       .retry_ms_table = _rbo_bo_0,
+ //       .retry_ms_table_count = 5,
+ //       .conceal_count = 5,
+ //       .secs_since_valid_ping = 30,
+ //       .secs_since_valid_hangup = 35,
+ //       .jitter_percent = 20,
+ //   };
+
+    //static const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 5000 };
+
+    //static const lws_retry_bo_t retry = {
+    //    .retry_ms_table = backoff_ms,
+    //    .retry_ms_table_count = LWS_ARRAY_SIZE(backoff_ms),
+    //    .conceal_count = LWS_ARRAY_SIZE(backoff_ms),
+
+    //    .secs_since_valid_ping = 3,  /* force PINGs after secs idle */
+    //    .secs_since_valid_hangup = 10, /* hangup after secs idle */
+
+    //    .jitter_percent = 20,
+    //};
+
+    static void connectClient(lws_sorted_usec_list_t* sul) {
+        struct ConnectionInfo* pInfo = lws_container_of(sul, struct ConnectionInfo, sul);
+        WebSocketTransport* pWSTransport = reinterpret_cast<WebSocketTransport*>(pInfo->user); // 示例用法
+        if (!pWSTransport) {
+            return;
+        }
+        lws_client_connect_info ccinfo = { 0 };
+        memset(&ccinfo, 0, sizeof(ccinfo));
+        ccinfo.context = pWSTransport->m_context;
+        ccinfo.ssl_connection = 0;//0 will disable ssl and enable ssl set the follow: LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
+        ccinfo.host = pWSTransport->m_url.c_str();
+        ccinfo.address = pWSTransport->m_url.c_str();
+        ccinfo.port = pWSTransport->m_port;
+        ccinfo.path = pWSTransport->m_path.c_str();
+        ccinfo.origin = pWSTransport->m_url.c_str();
+        ccinfo.protocol = pWSTransport->m_protocols[0].name;
+        ccinfo.pwsi = &pInfo->wsi;
+
+        ccinfo.retry_and_idle_policy = &retry;
+
+        ccinfo.userdata = pWSTransport;
+        pWSTransport->m_connectionInfo.wsi = lws_client_connect_via_info(&ccinfo);
+        if (!pWSTransport->m_connectionInfo.wsi) {
+            /*
+             * Failed... schedule a retry... we can't use the _retry_wsi()
+             * convenience wrapper api here because no valid wsi at this
+             * point.
+             */
+            if (lws_retry_sul_schedule(pWSTransport->m_context, 0, sul, &retry,
+                connectClient, &pInfo->retry_count)) {
+                lwsl_err("%s: connection attempts exhausted\n", __func__);
+                pWSTransport->m_stopped = true;
+            }
+        }
+    }
+
 WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) {
     memset(&m_sul, 0, sizeof(m_sul));
+    memset(&m_connectionInfo.sul, 0, sizeof(m_connectionInfo.sul));
 
    std::regex ex("(ws|wss)://([^/ :]+):?([^/ ]*)(/?[^ #]*)");
     std::cmatch what;
@@ -100,23 +176,42 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
                 break;
             case LWS_CALLBACK_CLIENT_CLOSED:
             std::cout<<"websocket closed"<<std::endl;
-                pSelf->m_wsClient = nullptr;
+                //pSelf->m_wsClient = nullptr;
                 pSelf->m_listener->onClosed();
+                goto do_retry;
                 break;
             case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
             std::cout<<"websocket connection error"<<std::endl;
                 pSelf->m_listener->onFailed();
+                goto do_retry;
                 break;
             case LWS_CALLBACK_WSI_DESTROY:
             std::cout<<"websocket connection destroy"<<std::endl;
-                cout << "[ws Connection destruction]" << endl;
-                pSelf->m_wsClient = nullptr;
+               // cout << "[ws Connection destruction]" << endl;
+                //pSelf->m_wsClient = nullptr;
                 break;
 
             default:
                 break;
             }
             return 0;
+        do_retry:
+            /*
+             * retry the connection to keep it nailed up
+             *
+             * For this example, we try to conceal any problem for one set of
+             * backoff retries and then exit the app.
+             *
+             * If you set retry.conceal_count to be LWS_RETRY_CONCEAL_ALWAYS,
+             * it will never give up and keep retrying at the last backoff
+             * delay plus the random jitter amount.
+             */
+            if (lws_retry_sul_schedule_retry_wsi(wsi, &pSelf->m_connectionInfo.sul, connectClient,
+                &pSelf->m_connectionInfo.retry_count)) {
+                lwsl_err("%s: connection attempts exhausted\n", __func__);
+                pSelf->m_stopped = true;
+            }
+
         },
         0,
         1024,
@@ -170,9 +265,9 @@ void WebSocketTransport::send(json message)
          auto msg = message.dump();
 	     m_msgQueue.push(msg);
          m_noMsg = false;
-         if (m_wsClient)
+         if (m_connectionInfo.wsi)
          {
-             lws_callback_on_writable(m_wsClient);
+             lws_callback_on_writable(m_connectionInfo.wsi);
          } 
      });
 }
@@ -205,85 +300,75 @@ uint32_t GetCurrentThreadId() {
 
 #endif
 
-
 //TODO should handle exception on connnect
 void WebSocketTransport::runWebSocket() {
-    //开启一个新的线程，用于websocket连接
-    m_pWsThread = new std::thread([&]() { 
-        //打印一下当前线程id
-        std::cout << "[WebSocketTransport] websocket thread id=" << std::this_thread::get_id() << std::endl;
-        lws_context_creation_info info;
-        memset(&info, 0, sizeof(info));
-        info.port = CONTEXT_PORT_NO_LISTEN;
-        info.iface = NULL;
-        info.protocols = m_protocols;
-        info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-        info.fd_limit_per_thread = 1024;
-        info.ssl_cert_filepath = NULL;
-        info.ssl_private_key_filepath = NULL;
-        info.gid = -1;
-        info.uid = -1;
-        info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-        //info.ws_ping_pong_interval = 10;
-        info.ka_time = 10;
-        info.ka_probes = 10;
-        info.ka_interval = 10;
-        if(m_context == nullptr){
-            m_context = lws_create_context(&info);
-            if(!m_context){
-                std::cout << "lws init failed" << std::endl;
-                return;
-            }
-        }
-        lws_client_connect_info ccinfo = {0};
-        memset(&ccinfo, 0, sizeof(ccinfo));
-        ccinfo.context = m_context;
-        ccinfo.ssl_connection = 0;//0 will disable ssl and enable ssl set the follow: LCCSCF_USE_SSL | LCCSCF_ALLOW_SELFSIGNED | LCCSCF_SKIP_SERVER_CERT_HOSTNAME_CHECK;
-        ccinfo.host = m_url.c_str();
-        ccinfo.address = m_url.c_str();
-        ccinfo.port = m_port;
-        ccinfo.path = m_path.c_str();
-        ccinfo.origin = m_url.c_str();
-        ccinfo.protocol = m_protocols[0].name;
+	//开启一个新的线程，用于websocket连接
+	m_pWsThread = new std::thread([&]() {
+		//打印一下当前线程id
+		std::cout << "[WebSocketTransport] websocket thread id=" << std::this_thread::get_id() << std::endl;
+		lws_context_creation_info info;
+		memset(&info, 0, sizeof(info));
+		info.port = CONTEXT_PORT_NO_LISTEN;
+		info.iface = NULL;
+		info.protocols = m_protocols;
+		info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+		info.fd_limit_per_thread = 1024;
+		info.ssl_cert_filepath = NULL;
+		info.ssl_private_key_filepath = NULL;
+		info.gid = -1;
+		info.uid = -1;
+		info.options |= LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
+		//info.ws_ping_pong_interval = 10;
+		info.ka_time = 10;
+		info.ka_probes = 10;
+		info.ka_interval = 10;
+		if (m_context == nullptr) {
+			m_context = lws_create_context(&info);
+			if (!m_context) {
+				std::cout << "lws init failed" << std::endl;
+				return;
+			}
+		}
+        m_connectionInfo.user = this;
+		/* schedule the first client connection attempt to happen immediately */
+		lws_sul_schedule(m_context, 0, &m_connectionInfo.sul, connectClient, 1);
 
-        ccinfo.userdata = this;
-        m_wsClient = lws_client_connect_via_info(&ccinfo);
-        while (!m_stopped && m_wsClient)
-        {
-            // 此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
-            if (!m_msgQueue.empty())
-            {
-                if (m_wsClient)
-                {
-                    // 打印一下当前线程信息
-                    std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
-                    lws_callback_on_writable(m_wsClient);
-                }
-            }
-            // 此处需研究实现重连机制
-            lws_service(m_context, 0);
-            // 处理所有调度的任务
-            while (!tasks.empty())
-            {
-                std::function<void()> task;
-                {
-                    std::lock_guard<std::mutex> lock(tasks_mutex);
-                    if (!tasks.empty())
-                    {
-                        task = tasks.front();
-                        tasks.pop();
-                    }
-                }
-                if (task)
-                {
-                    task(); // 在线程A的上下文中执行任务
-                }
-            }
-        }
-        lws_context_destroy(m_context);
-        m_wsClient = nullptr;
-        std::cout<<"websocket thread exit"<<std::endl;
-    });
+		while (!m_stopped && m_nServiceRet >= 0)
+		{
+			// 此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
+			//if (!m_msgQueue.empty())
+			//{
+			//    if (m_wsClient)
+			//    {
+			//        // 打印一下当前线程信息
+			//        std::cout << "[WebSocketTransport] send thread id=" << std::this_thread::get_id() << std::endl;
+			//        lws_callback_on_writable(m_wsClient);
+			//    }
+			//}
+
+			// 此处需研究实现重连机制
+			m_nServiceRet = lws_service(m_context, 0);
+			// 处理所有调度的任务
+			while (!tasks.empty())
+			{
+				std::function<void()> task;
+				{
+					std::lock_guard<std::mutex> lock(tasks_mutex);
+					if (!tasks.empty())
+					{
+						task = tasks.front();
+						tasks.pop();
+					}
+				}
+				if (task)
+				{
+					task(); // 在线程A的上下文中执行任务
+				}
+			}
+		}
+		lws_context_destroy(m_context);
+		std::cout << "websocket thread exit" << std::endl;
+		});
 }
 
 void WebSocketTransport::scheduleTask(int afterMs, std::function<void()> task)
@@ -308,7 +393,8 @@ void WebSocketTransport::scheduleTask(int afterMs, std::function<void()> task)
                 if (self->m_task) {
                     self->m_task();
                 }
-            }, delay); });
+            }, delay); 
+        });
 }
 
 void WebSocketTransport::cancelScheduledTask()
