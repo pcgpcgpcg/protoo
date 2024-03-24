@@ -1,14 +1,13 @@
 #include "WebSocketTransport.h"
 #include "Message.h"
 #include <regex>
+#include <fmt/core.h>
+#include <fmt/color.h>
 //#include <cpprest/asyncrt_utils.h>
 //using namespace std;
 //using namespace nlohmann;
 //constructor
 #define TRANSPORT_LOG_ENABLE 1
-
-std::condition_variable g_cvOnOpen;
-    std::mutex g_mtx;
 
     static const uint32_t backoff_ms[] = { 1000, 2000, 3000, 4000, 4000 };
 
@@ -55,6 +54,10 @@ std::condition_variable g_cvOnOpen;
         if (!pWSTransport) {
             return;
         }
+		if (pInfo->retry_count > 0) {
+			fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+				"连接异常，正在尝试重连, 第{}!\n次", pInfo->retry_count);
+		}
         lws_client_connect_info ccinfo = { 0 };
         memset(&ccinfo, 0, sizeof(ccinfo));
         ccinfo.context = pWSTransport->m_context;
@@ -69,7 +72,7 @@ std::condition_variable g_cvOnOpen;
 
         ccinfo.retry_and_idle_policy = &retry;
 
-        ccinfo.userdata = pWSTransport;
+        ccinfo.userdata = pInfo;
         pWSTransport->m_connectionInfo.wsi = lws_client_connect_via_info(&ccinfo);
         if (!pWSTransport->m_connectionInfo.wsi) {
             /*
@@ -83,6 +86,110 @@ std::condition_variable g_cvOnOpen;
                 pWSTransport->m_stopped = true;
             }
         }
+    }
+
+    static int
+        callback_minimal(struct lws* wsi, enum lws_callback_reasons reason,
+            void* user, void* in, size_t len)
+    {
+        struct ConnectionInfo* pInfo = (struct ConnectionInfo*)user;
+        if (!pInfo) {
+            return 0;
+        }
+        WebSocketTransport* pSelf = reinterpret_cast<WebSocketTransport*>(pInfo->user); // 示例用法
+        if (!pSelf) {
+            return 0;
+        }
+
+        switch (reason) {
+        case LWS_CALLBACK_CLIENT_ESTABLISHED:
+            std::cout << "websocket connected" << std::endl;
+            if (pInfo->retry_count > 0) {
+				fmt::print(fg(fmt::color::green) | fmt::emphasis::bold,
+                    					"第{}次自动重连成功!", pInfo->retry_count);
+                pSelf->m_listener->onReConnected();
+            }
+            else {
+                fmt::print(fg(fmt::color::green) | fmt::emphasis::bold, "websocket连接成功!");
+                pSelf->m_listener->onConnected();
+            }
+           
+            break;
+
+        case LWS_CALLBACK_CLIENT_RECEIVE:
+            if (len > 0)
+            {
+                pSelf->m_receivedMsg.append((const char*)in, len);
+                if (lws_is_final_fragment(wsi))
+                {
+                    std::cout << "received message:" << pSelf->m_receivedMsg << std::endl;
+                    auto jmsg = protoo::Message::parse(pSelf->m_receivedMsg);
+                    pSelf->m_listener->onMessage(jmsg);
+                    pSelf->m_receivedMsg.clear();
+                }
+            }
+            break;
+        case LWS_CALLBACK_CLIENT_WRITEABLE:
+            if (!pSelf->m_msgQueue.empty())
+            {
+                auto msg = pSelf->m_msgQueue.front();
+                std::cout << "send message:" << msg << std::endl;
+                pSelf->m_msgQueue.pop();
+                auto* p = (unsigned char*)malloc(LWS_SEND_BUFFER_PRE_PADDING + msg.length() + LWS_SEND_BUFFER_POST_PADDING);
+                memcpy(p + LWS_SEND_BUFFER_PRE_PADDING, msg.c_str(), msg.length());
+                lws_write(wsi, p + LWS_SEND_BUFFER_PRE_PADDING, msg.length(), LWS_WRITE_TEXT);
+                free(p);
+            }
+            else
+            {
+                pSelf->m_noMsg = true;
+                // cout << "Send keep-alive message" << endl;
+                // uint8_t ping[LWS_PRE + 125];
+                // lws_write(wsi, ping + LWS_PRE, 0, LWS_WRITE_PING);
+            }
+            break;
+        case LWS_CALLBACK_CLIENT_CLOSED:
+            std::cout << "websocket closed" << std::endl;
+            //pSelf->m_wsClient = nullptr;
+            pSelf->m_listener->onClosed();
+            goto do_retry;
+            break;
+        case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
+            std::cout << "websocket connection error" << std::endl;
+            pSelf->m_listener->onFailed();
+            goto do_retry;
+            break;
+        case LWS_CALLBACK_WSI_DESTROY:
+            std::cout << "websocket connection destroy" << std::endl;
+            // cout << "[ws Connection destruction]" << endl;
+             //pSelf->m_wsClient = nullptr;
+            break;
+
+        default:
+            break;
+        }
+
+        return lws_callback_http_dummy(wsi, reason, user, in, len);
+
+    do_retry:
+        /*
+         * retry the connection to keep it nailed up
+         *
+         * For this example, we try to conceal any problem for one set of
+         * backoff retries and then exit the app.
+         *
+         * If you set retry.conceal_count to be LWS_RETRY_CONCEAL_ALWAYS,
+         * it will never give up and keep retrying at the last backoff
+         * delay plus the random jitter amount.
+         */
+        fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+            "连接异常，正在尝试重连, 第{}!\n次", pInfo->retry_count);
+        if (lws_retry_sul_schedule_retry_wsi(wsi, &pInfo->sul, connectClient,
+            &pInfo->retry_count)) {
+            lwsl_err("%s: connection attempts exhausted\n", __func__);
+            pSelf->m_stopped = true;
+        }
+        return 0;
     }
 
 WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) {
@@ -120,113 +227,15 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
     //set protocols
     m_protocols[0] = {
         "protoo",
-        [](struct lws *wsi, enum lws_callback_reasons reason, void *user, void *in, size_t len) -> int
-        {
-            //auto pSelf = (WebSocketTransport*)lws_context_user(lws_get_context(wsi));
-            auto *pSelf = (WebSocketTransport *)user;
-            if(!pSelf){
-                return 0;
-            }
-            if (!pSelf->m_listener)
-            {
-                return 0;
-            }
-            switch (reason)
-            {
-            case LWS_CALLBACK_CLIENT_ESTABLISHED:
-                std::cout << "websocket connected" << std::endl;
-                //pSelf->m_listener->onOpen();
-                {
-                std::unique_lock<std::mutex> lk2(g_mtx);
-                
-                }
-                g_cvOnOpen.notify_one();
-                break;
-            case LWS_CALLBACK_CLIENT_RECEIVE:
-                if (len > 0)
-                {
-                    pSelf->m_receivedMsg.append((const char *)in, len);
-                    if (lws_is_final_fragment(wsi))
-                    {
-                        std::cout<<"received message:"<<pSelf->m_receivedMsg<<std::endl;
-                        auto jmsg = protoo::Message::parse(pSelf->m_receivedMsg);
-                        pSelf->m_listener->onMessage(jmsg);
-                        pSelf->m_receivedMsg.clear();
-                    }
-                }
-                break;
-            case LWS_CALLBACK_CLIENT_WRITEABLE:
-                if (!pSelf->m_msgQueue.empty())
-                {
-                    auto msg = pSelf->m_msgQueue.front();
-                    std::cout<<"send message:"<<msg<<std::endl;
-                    pSelf->m_msgQueue.pop();
-                    auto *p = (unsigned char *)malloc(LWS_SEND_BUFFER_PRE_PADDING + msg.length() + LWS_SEND_BUFFER_POST_PADDING);
-                    memcpy(p + LWS_SEND_BUFFER_PRE_PADDING, msg.c_str(), msg.length());
-                    lws_write(wsi, p + LWS_SEND_BUFFER_PRE_PADDING, msg.length(), LWS_WRITE_TEXT);
-                    free(p);
-                }
-                else
-                {
-                    pSelf->m_noMsg = true;
-                    // cout << "Send keep-alive message" << endl;
-                    // uint8_t ping[LWS_PRE + 125];
-                    // lws_write(wsi, ping + LWS_PRE, 0, LWS_WRITE_PING);
-                }
-                break;
-            case LWS_CALLBACK_CLIENT_CLOSED:
-            std::cout<<"websocket closed"<<std::endl;
-                //pSelf->m_wsClient = nullptr;
-                pSelf->m_listener->onClosed();
-                goto do_retry;
-                break;
-            case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-            std::cout<<"websocket connection error"<<std::endl;
-                pSelf->m_listener->onFailed();
-                goto do_retry;
-                break;
-            case LWS_CALLBACK_WSI_DESTROY:
-            std::cout<<"websocket connection destroy"<<std::endl;
-               // cout << "[ws Connection destruction]" << endl;
-                //pSelf->m_wsClient = nullptr;
-                break;
-
-            default:
-                break;
-            }
-            return 0;
-        do_retry:
-            /*
-             * retry the connection to keep it nailed up
-             *
-             * For this example, we try to conceal any problem for one set of
-             * backoff retries and then exit the app.
-             *
-             * If you set retry.conceal_count to be LWS_RETRY_CONCEAL_ALWAYS,
-             * it will never give up and keep retrying at the last backoff
-             * delay plus the random jitter amount.
-             */
-            if (lws_retry_sul_schedule_retry_wsi(wsi, &pSelf->m_connectionInfo.sul, connectClient,
-                &pSelf->m_connectionInfo.retry_count)) {
-                lwsl_err("%s: connection attempts exhausted\n", __func__);
-                pSelf->m_stopped = true;
-            }
-
-        },
+       callback_minimal,
         0,
         1024,
         0,
-        this,
-        10};
-         m_protocols[1] = {nullptr, nullptr, 0, 0};
+        NULL,
+        0};
+         m_protocols[1] = LWS_PROTOCOL_LIST_TERM;
     //lauch websocket connection
 	runWebSocket();
-    //等待连接成功的消息
-    std::unique_lock<std::mutex> lk(g_mtx);
-    g_cvOnOpen.wait(lk);
-    //接收到了信号，说明连接成功了 TODO:此处需要加个超时机制
-    int a= 1;
-    a++;
 }
 
 WebSocketTransport::~WebSocketTransport()
@@ -312,7 +321,7 @@ void WebSocketTransport::runWebSocket() {
 		info.iface = NULL;
 		info.protocols = m_protocols;
 		info.options = LWS_SERVER_OPTION_DO_SSL_GLOBAL_INIT;
-		info.fd_limit_per_thread = 1024;
+		info.fd_limit_per_thread = 1 + 1 + 1;
 		info.ssl_cert_filepath = NULL;
 		info.ssl_private_key_filepath = NULL;
 		info.gid = -1;

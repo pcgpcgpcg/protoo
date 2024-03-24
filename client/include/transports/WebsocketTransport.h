@@ -35,7 +35,8 @@ public:
     class TransportListener
     {
     public:
-        virtual void onOpen() = 0;
+        virtual void onConnected() = 0;
+        virtual void onReConnected() = 0;
         virtual void onClosed() = 0;
         virtual void onMessage(json message) = 0;
         virtual void onDisconnected() = 0;
@@ -71,6 +72,11 @@ public:
     ConnectionInfo m_connectionInfo{ nullptr };
     // Thread exit flag stop && noMsg
     volatile bool m_stopped{ false };
+    std::string m_receivedMsg;
+    volatile bool m_noMsg{ true };
+    // Pending messages queue
+    std::queue<std::string> m_msgQueue;
+    TransportListener* m_listener{ nullptr };
 
 private:
     bool m_closed;
@@ -85,11 +91,6 @@ private:
 private:
     //lws *m_wsClient{nullptr};
     // noMsg is used to ensure that messages leaveing the room are sent out before the thread exits
-    volatile bool m_noMsg{true};
-    std::string m_receivedMsg;
-    // Pending messages queue
-    std::queue<std::string> m_msgQueue;
-    TransportListener *m_listener{nullptr};
     std::function<void()> m_task;
     lws_sorted_usec_list_t m_sul;
     //MessageQueue m_messageQueue;

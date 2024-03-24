@@ -14,7 +14,8 @@ using AcceptCallback = std::function<void(const std::string &)>;							 // 本�
 using RejectCallback = std::function<void(int, const std::string &)>;						 // 本地拒绝服务器的request
 using onServerRequestCB = std::function<void(const json &, AcceptCallback, RejectCallback)>; // 本地接受服务器的request
 using onServerNotificationCB = std::function<void(const json &)>;							 // 本地接受服务器的notification
-using onPeerOpenCB = std::function<void()>;
+using onPeerConnectedCB = std::function<void()>;
+using onPeerReConnectedCB = std::function<void()>;
 using onPeerClosedCB = std::function<void()>;
 using onPeerDisconnectedCB = std::function<void()>;
 using onPeerFailedCB = std::function<void()>;
@@ -60,7 +61,8 @@ namespace protoo {
 		~Peer();
 		/* Virtual methods inherited from WebsocketTransport::TransportListener. */
 	public:
-		void onOpen() override;
+		void onConnected() override;
+		void onReConnected() override;
 		void onClosed() override;
 		void onMessage(json message) override;
 		void onDisconnected() override;
@@ -92,8 +94,9 @@ namespace protoo {
 		json m_data = json({});
 		map<int, shared_ptr<SENT_MSG>> m_sents;
 		std::map<int, std::shared_ptr<std::promise<json>>> m_promises;
-		public:
-		onPeerOpenCB onPeerOpen;
+	public:
+		onPeerConnectedCB onPeerConnected;
+		onPeerReConnectedCB onPeerReConnected;
 		onPeerClosedCB onPeerClosed;
 		onPeerDisconnectedCB onPeerDisconnected;
 		onPeerFailedCB onPeerFailed;

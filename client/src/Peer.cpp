@@ -76,13 +76,23 @@ namespace protoo {
 		this->m_pTransport->send(request);
 	}
 
-	void Peer::onOpen()
+	void Peer::onConnected()
 	{
-		std::cout << "[Peer] onOpen!" << std::endl;
+		std::cout << "[Peer] onConnected!" << std::endl;
 		m_connected = true;
-		if (onPeerOpen)
+		if (onPeerConnected)
 		{
-			onPeerOpen();
+			onPeerConnected();
+		}
+	}
+
+	void Peer::onReConnected()
+	{
+		std::cout << "[Peer] onReConnected!" << std::endl;
+		m_connected = true;
+		if (onPeerReConnected)
+		{
+			onPeerReConnected();
 		}
 	}
 

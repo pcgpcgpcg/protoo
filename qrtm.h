@@ -157,6 +157,7 @@ public:
     virtual void onDisconnected() = 0;
     virtual void onReconnecting() = 0;
     virtual void onReconnected() = 0;
+    virtual void onClosed() = 0;
 };
 
 class RTM {
@@ -175,6 +176,7 @@ class RTM {
         std::string m_userId;
         RTMConfig m_config;
         RTMListener* m_pListener;
+        std::string m_channelName{""}; //保存之前订阅的channel,便于重连后自动订阅
 };
 
 #endif // QRTM_H

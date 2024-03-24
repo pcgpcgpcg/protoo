@@ -51,6 +51,11 @@ public:
     {
         // Your implementation here
     }
+
+    void onClosed() override
+    {
+
+     }
 };
 
 void sigint_handler(int sig)

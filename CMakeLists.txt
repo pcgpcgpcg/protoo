@@ -53,6 +53,8 @@ message(STATUS PROJECT_NAME = ${PROJECT_NAME})
 FILE(GLOB_RECURSE all_source_files "client/src/*.cpp", "main.cpp", "qrtm.cpp")
 FILE(GLOB_RECURSE all_head_files "client/include/*.h", "qrtm.h")
 
+add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/thirdparty/fmt EXCLUDE_FROM_ALL)
+
 add_executable(
             ${PROJECT_NAME} 
             ${all_head_files}
@@ -77,6 +79,7 @@ target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/libwebsockets.a
                                       ${OPENSSL_DIR}/lib/libssl.a 
                                       ${OPENSSL_DIR}/lib/libcrypto.a
                                       ${LIBUV_DIR}/lib/libuv.a
+                                      fmt::fmt-header-only
                      )
     endif()
 endif()
@@ -86,6 +89,7 @@ if(WIN32)
     target_link_libraries(${PROJECT_NAME} ${LIBWEBSOCKETS_DIR}/lib/debug/websockets.lib 
     ${OPENSSL_DIR}/lib/libssl.lib 
     ${OPENSSL_DIR}/lib/libcrypto.lib
+    fmt::fmt-header-only
     # ${LIBUV_DIR}/lib/libuv.a
 )
 endif()
