@@ -153,23 +153,36 @@ class RTMListener {
 public:
     virtual void onReceiveMessage(RTM*, const std::string&, const std::string&, const std::string&) = 0;
     virtual void onReceivePresence(RTM*, const std::string&, const QRtmPresenceEvent&) = 0;
-    virtual void onConnected() = 0;
-    virtual void onDisconnected() = 0;
-    virtual void onReconnecting() = 0;
-    virtual void onReconnected() = 0;
-    virtual void onClosed() = 0;
+    virtual void onConnected(RTM*) = 0;
+    virtual void onDisconnected(RTM*) = 0;
+    virtual void onReconnecting(RTM*) = 0;
+    virtual void onReconnected(RTM*) = 0;
+    virtual void onClosed(RTM*) = 0;
 };
 
 class RTM {
     public:
         RTM(std::string appId, std::string userId, const RTMConfig& config, RTMListener* listener);
         ~RTM();
+        // 为了防止潜在的问题，如资源泄漏或竞争条件,禁止类的复制和赋值
+        RTM(const RTM&) = delete;
+        RTM& operator=(const RTM&) = delete;
     public:
+        void InvokeTask(std::function<void()> task);
+        void connect(std::string serverUrl);
         std::future<LoginResponse> login();
         std::future<LogoutResponse> logout();
         std::future<SubscribeResponse> subscribe(const std::string& channelName);
         std::future<UnsubscribeResponse> unsubscribe(const std::string& channelName);
         void publish(const std::string& channelName, const std::string& message);
+private:
+    std::future<LoginResponse> loginInternal();
+    std::future<LogoutResponse> logoutInternal();
+    std::future<SubscribeResponse> subscribeInternal(const std::string& channelName);
+    std::future<UnsubscribeResponse> unsubscribeInternal(const std::string& channelName);
+    void publishInternal(const std::string& channelName, const std::string& message);
+    void WorkerFunction();
+    bool IsRunningOnWorkerThread() const;
     private:
     std::unique_ptr<protoo::Peer> m_pPeer;
         std::string m_appId;
@@ -177,6 +190,13 @@ class RTM {
         RTMConfig m_config;
         RTMListener* m_pListener;
         std::string m_channelName{""}; //保存之前订阅的channel,便于重连后自动订阅
+private:
+    std::thread m_WorkerThread;
+    std::thread::id m_WorkerThreadId{std::thread::id()};
+    std::atomic<bool> m_bRunning{false};
+    // 线程安全的任务队列
+    std::queue<std::function<void()>> tasks;
+    std::mutex tasks_mutex;
 };
 
 #endif // QRTM_H

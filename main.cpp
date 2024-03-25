@@ -31,28 +31,38 @@ public:
         // Your implementation here
     }
 
-    void onConnected() override
+    void onConnected(RTM* rtm) override
     {
         //连接上之后，登陆 登陆频道 发送消息
         std::cout << "[MAIN] RTM::onConnected" << std::endl;
+        try {
+            //打印当前线程id
+            std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
+            rtm->login().get();
+            rtm->subscribe("notification").get();
+            rtm->publish("notification", "hello world");
+        }
+        catch (const std::exception& e) {
+            std::cout << "login error" << std::endl;
+        }
     }
 
-    void onDisconnected() override
+    void onDisconnected(RTM*) override
     {
         // Your implementation here
     }
 
-    void onReconnecting() override
+    void onReconnecting(RTM*) override
     {
         // Your implementation here
     }
 
-    void onReconnected() override
+    void onReconnected(RTM*) override
     {
         // Your implementation here
     }
 
-    void onClosed() override
+    void onClosed(RTM*) override
     {
 
      }
@@ -68,16 +78,9 @@ int main(int argc, char *argv[]){
     std::cout<<"hello world" << std::endl;
 
     MyRTMListener listener;
+    std::string defaultUrl = "ws://49.232.122.245:8002";
     std::unique_ptr<RTM> rtm(new RTM("appId", "user1234567", RTMConfig(), &listener));
-    try{
-        //打印当前线程id
-        std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
-        rtm->login().get();
-        rtm->subscribe("notification").get();
-        rtm->publish("notification", "hello world");
-        }catch(const std::exception &e){
-        std::cout << "login error" << std::endl;
-    }
+    rtm->connect(defaultUrl);
         
     //     //进行http post请求
     // auto transport = new HTTPTransport();
