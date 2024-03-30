@@ -6,6 +6,8 @@
 #include <memory>
 //#include "uv.h"
 #include "qrtm.h"
+#include <fmt/core.h>
+#include <fmt/color.h>
 // #ifdef __cplusplus
 // extern "C" {
 // #endif
@@ -21,10 +23,32 @@ public:
     MyRTMListener() {}
     ~MyRTMListener() {}
 
-    void onReceiveMessage(RTM*, const std::string&, const std::string&, const std::string&) override
-    {
-        //连接上之后，接收消息
-    }
+	void onReceiveMessage(RTM*, const std::string& channelId, const std::string& peerId, const std::string& msg) override
+	{
+		// 解析 JSON 字符串
+		nlohmann::json jsonMsgData = nlohmann::json::parse(msg);
+		// 访问嵌套数据
+		auto actionName = jsonMsgData["action"].get<std::string>();
+		//连接上之后，接收消息
+		if (actionName == std::string("call")) {
+            fmt::print(fg(fmt::color::steel_blue) | fmt::emphasis::italic, "Incoming call from {}, Do you agree? (yes/no): \n", peerId);
+			std::string userInput;
+			std::cin >> userInput;
+
+			if (userInput == "yes") {
+				// 处理用户同意的情况
+				std::cout << "Call accepted." << std::endl;
+			}
+			else if (userInput == "no") {
+				// 处理用户不同意的情况
+				std::cout << "Call rejected." << std::endl;
+			}
+			else {
+				// 处理无效输入
+				std::cout << "Invalid input." << std::endl;
+			}
+		}
+	}
 
     void onReceivePresence(RTM*, const std::string&, const QRtmPresenceEvent&) override
     {
@@ -73,6 +97,29 @@ void sigint_handler(int sig)
     //interrupted = 1;
 }
 
+void processCommand(const std::string& command) {
+    if (command == "help") {
+        fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+            "Supported commands:\n");
+        fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+            "help - Display this help message\n");
+        fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+            "call - call the room or person\n");
+        fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
+            "exit - Exit the program\n");
+    }
+    else if (command.substr(0, 4) == "call") {
+        std::string toNumber = command.substr(5); // 假设命令格式为"call 8881"
+        std::cout << " call to " << toNumber << std::endl;
+    }
+    else if (command == "exit") {
+        std::exit(0);
+    }
+    else {
+        std::cout << "Unknown command: " << command << "\n";
+    }
+}
+
 int main(int argc, char *argv[]){
     //signal(SIGINT, sigint_handler);
     std::cout<<"hello world" << std::endl;
@@ -81,6 +128,9 @@ int main(int argc, char *argv[]){
     std::string defaultUrl = "ws://49.232.122.245:8002";
     std::unique_ptr<RTM> rtm(new RTM("appId", "user1234567", RTMConfig(), &listener));
     rtm->connect(defaultUrl);
+
+    //just wait ws and worker thread log show before interactive
+    //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         
     //     //进行http post请求
     // auto transport = new HTTPTransport();
@@ -97,8 +147,11 @@ int main(int argc, char *argv[]){
     // auto transport = new WebSocketTransport("ws://152.136.16.141:8080/websocket", &listener);
     // listener.onOpen();
     // transport->send(json::parse("{\"type\":\"login\",\"data\":{\"username\":\"test\",\"password\":\"test\"}}"));
+    std::string input;
     while(true){
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        std::getline(std::cin, input); // 读取整行输入
+        processCommand(input); // 处理输入
     }
 
     return 0;

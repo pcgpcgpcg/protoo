@@ -314,7 +314,7 @@ void WebSocketTransport::runWebSocket() {
 	//开启一个新的线程，用于websocket连接
 	m_pWsThread = new std::thread([&]() {
 		//打印一下当前线程id
-		std::cout << "[WebSocketTransport] websocket thread id=" << std::this_thread::get_id() << std::endl;
+		//std::cout << "[WebSocketTransport] websocket thread id=" << std::this_thread::get_id() << std::endl;
 		lws_context_creation_info info;
 		memset(&info, 0, sizeof(info));
 		info.port = CONTEXT_PORT_NO_LISTEN;
