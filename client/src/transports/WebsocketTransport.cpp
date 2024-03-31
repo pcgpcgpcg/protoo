@@ -83,7 +83,7 @@
             if (lws_retry_sul_schedule(pWSTransport->m_context, 0, sul, &retry,
                 connectClient, &pInfo->retry_count)) {
                 lwsl_err("%s: connection attempts exhausted\n", __func__);
-                pWSTransport->m_stopped = true;
+                pWSTransport->m_closed = true;
             }
         }
     }
@@ -187,7 +187,7 @@
         if (lws_retry_sul_schedule_retry_wsi(wsi, &pInfo->sul, connectClient,
             &pInfo->retry_count)) {
             lwsl_err("%s: connection attempts exhausted\n", __func__);
-            pSelf->m_stopped = true;
+            pSelf->m_closed = true;
         }
         return 0;
     }
@@ -220,10 +220,8 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
             m_port = atoi(port.c_str());
         }
     }
-    m_closed = false;
     //m_options = options;
     m_listener = listener;
-	m_closed = false;
     //set protocols
     m_protocols[0] = {
         "protoo",
@@ -240,7 +238,7 @@ WebSocketTransport::WebSocketTransport(string url, TransportListener* listener) 
 
 WebSocketTransport::~WebSocketTransport()
 {
-    m_stopped = true;
+    m_closed = true;
     if (m_pWsThread && m_pWsThread->joinable())
     {
         m_pWsThread->join();
@@ -256,17 +254,17 @@ WebSocketTransport::~WebSocketTransport()
     }
 }
 
-bool WebSocketTransport::closed() {
-	return m_closed;
-}
+// bool WebSocketTransport::closed() {
+// 	return m_closed;
+// }
 
-void WebSocketTransport::close() {
-	if (m_closed) {
-		return;
-	}
-	m_closed = true;
-	m_listener->onClosed();
-}
+// void WebSocketTransport::close() {
+// 	if (m_closed) {
+// 		return;
+// 	}
+// 	m_closed = true;
+// 	m_listener->onClosed();
+// }
 
 void WebSocketTransport::send(json message)
 {
@@ -342,7 +340,7 @@ void WebSocketTransport::runWebSocket() {
 		/* schedule the first client connection attempt to happen immediately */
 		lws_sul_schedule(m_context, 0, &m_connectionInfo.sul, connectClient, 1);
 
-		while (!m_stopped && m_nServiceRet >= 0)
+		while (!m_closed && m_nServiceRet >= 0)
 		{
 			// 此处还要看一下发送队列，如果发送队列里有消息，就要调用lws_callback_on_writable
 			//if (!m_msgQueue.empty())

@@ -16,24 +16,25 @@ namespace protoo {
 	}
 	Peer::~Peer() {
 		if(m_pTransport.get()){
-			m_pTransport->close();
+			//m_pTransport->close();
+			m_pTransport.reset();
 		}
 	}
 
-	bool Peer::closed()
-	{
-		return m_closed;
-	}
+	// bool Peer::closed()
+	// {
+	// 	return m_closed;
+	// }
 
-	void Peer::close()
-	{
-		if (m_closed) {
-			return;
-		}
-		if(m_pTransport.get()){
-			m_pTransport->close();
-		}
-	}
+	// void Peer::close()
+	// {
+	// 	if (m_closed) {
+	// 		return;
+	// 	}
+	// 	if(m_pTransport.get()){
+	// 		m_pTransport->close();
+	// 	}
+	// }
 
 	bool Peer::connected() {
 		return m_connected;

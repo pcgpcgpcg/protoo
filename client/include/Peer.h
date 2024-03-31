@@ -69,11 +69,11 @@ namespace protoo {
 		void onFailed() override;
 
 	public:
-		bool closed();
+		//bool closed();
 		bool connected();
 		json data();
 		void setData(json data);
-		void close();
+		//void close();
 		//void requestTest(string method, json data);
 		std::future<json> request(string method, json data = json({}));
 		void notify(string method, json data = json({}));

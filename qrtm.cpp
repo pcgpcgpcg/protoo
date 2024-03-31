@@ -23,6 +23,7 @@ RTM::~RTM(){
     if (m_WorkerThread.joinable()) {
         m_WorkerThread.join();
     }
+    m_pPeer.reset();
 }
 
 std::future<LoginResponse> RTM::login() {

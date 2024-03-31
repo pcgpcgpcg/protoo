@@ -154,6 +154,8 @@ int main(int argc, char *argv[]){
         processCommand(input); // 处理输入
     }
 
+    rtm.reset();
+
     return 0;
 }
 

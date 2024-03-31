@@ -48,8 +48,8 @@ public:
     ~WebSocketTransport();
 
 public:
-    bool closed();
-    void close();
+    //bool closed();
+    //void close();
     void sendSync(json message);
     void send(json message);
 
@@ -71,7 +71,7 @@ public:
     struct lws_protocols m_protocols[2];
     ConnectionInfo m_connectionInfo{ nullptr };
     // Thread exit flag stop && noMsg
-    volatile bool m_stopped{ false };
+    volatile bool m_closed{ false };
     std::string m_receivedMsg;
     volatile bool m_noMsg{ true };
     // Pending messages queue
@@ -79,7 +79,6 @@ public:
     TransportListener* m_listener{ nullptr };
 
 private:
-    bool m_closed;
     std::chrono::time_point<std::chrono::system_clock> m_lastPingTime;
     std::string m_msg_to_send;
     std::thread *m_pWsThread;
