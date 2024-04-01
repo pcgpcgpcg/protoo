@@ -54,7 +54,7 @@ namespace protoo {
 	json Message::createRequest(string method, json data) {
 		json request = {
 		  {"request", true},
-		  {"id", generateRandomNumber()},
+		  {"id", generateRandomNumber(5)},
 		  {"method", method},
 		  {"data", data}
 		};

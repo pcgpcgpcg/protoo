@@ -182,6 +182,9 @@ void RTM::connect(std::string serverUrl) {
         //解析method
         auto method = data["method"].get<std::string>();
         auto msgData = data["data"];
+        if (msgData.find("channelId") == msgData.end() || msgData.find("peerId") == msgData.end()) {
+            return;
+        }
         auto channelId = msgData["channelId"].get<std::string>();
         auto peerId = msgData["peerId"].get<std::string>();
         if (method == "channelMsgText") {

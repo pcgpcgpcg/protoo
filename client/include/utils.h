@@ -6,5 +6,5 @@
 #include <chrono>
 #include <functional>
 //生成随机数(0-1)*10000000
-int generateRandomNumber();
+int generateRandomNumber(size_t length);
 #endif

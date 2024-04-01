@@ -23,32 +23,57 @@ public:
     MyRTMListener() {}
     ~MyRTMListener() {}
 
-	void onReceiveMessage(RTM*, const std::string& channelId, const std::string& peerId, const std::string& msg) override
+	void onReceiveMessage(RTM* rtm, const std::string& channelId, const std::string& peerId, const std::string& msg) override
 	{
-		// 解析 JSON 字符串
-		nlohmann::json jsonMsgData = nlohmann::json::parse(msg);
-		// 访问嵌套数据
-		auto actionName = jsonMsgData["action"].get<std::string>();
-		//连接上之后，接收消息
-		if (actionName == std::string("call")) {
+        // 解析 JSON 字符串
+        nlohmann::json jsonMsgData = nlohmann::json::parse(msg);
+        if (jsonMsgData.find("action") == jsonMsgData.end()) {
+            return;
+        }
+        // 访问嵌套数据
+        auto actionName = jsonMsgData["action"].get<std::string>();
+        // 连接上之后，接收消息
+        if (actionName == std::string("call"))
+        {
             fmt::print(fg(fmt::color::steel_blue) | fmt::emphasis::italic, "Incoming call from {}, Do you agree? (yes/no): \n", peerId);
-			std::string userInput;
-			std::cin >> userInput;
+            std::string userInput;
+            std::cin >> userInput;
 
-			if (userInput == "yes") {
-				// 处理用户同意的情况
-				std::cout << "Call accepted." << std::endl;
-			}
-			else if (userInput == "no") {
-				// 处理用户不同意的情况
-				std::cout << "Call rejected." << std::endl;
-			}
-			else {
-				// 处理无效输入
-				std::cout << "Invalid input." << std::endl;
-			}
-		}
-	}
+            if (userInput == "yes")
+            {
+                // 处理用户同意的情况
+                std::cout << "Call accepted." << std::endl;
+                // TODO: 发送 同意 消息给对方
+                // 调用rtm发送呼叫信息
+                json requestData = {
+                    {"action", "response"},
+                    {"result", "accept"}};
+                rtm->publish("notification", requestData.dump());
+            }
+            else if (userInput == "no")
+            {
+                // 处理用户不同意的情况
+                std::cout << "Call rejected." << std::endl;
+                // TODO: 发送 拒绝 消息给对方
+                 json requestData = {
+                    {"action", "response"},
+                    {"result", "decline"}};
+                rtm->publish("notification", requestData.dump());
+            }
+            else
+            {
+                // 处理无效输入
+                std::cout << "Invalid input." << std::endl;
+            }
+        }else if(actionName == std::string("response")){
+            auto result = jsonMsgData["result"].get<std::string>();
+            if(result == "accept"){
+                std::cout << "Call accepted." << std::endl;
+            }else if(result == "decline"){
+                std::cout << "Call rejected." << std::endl;
+            }
+        }
+    }
 
     void onReceivePresence(RTM*, const std::string&, const QRtmPresenceEvent&) override
     {
@@ -64,7 +89,6 @@ public:
             std::cout << "[MAIN] main thread id: " << std::this_thread::get_id() << std::endl;
             rtm->login().get();
             rtm->subscribe("notification").get();
-            rtm->publish("notification", "hello world");
         }
         catch (const std::exception& e) {
             std::cout << "login error" << std::endl;
@@ -97,7 +121,7 @@ void sigint_handler(int sig)
     //interrupted = 1;
 }
 
-void processCommand(const std::string& command) {
+void processCommand(RTM* rtm, const std::string& command) {
     if (command == "help") {
         fmt::print(fg(fmt::color::crimson) | fmt::emphasis::bold,
             "Supported commands:\n");
@@ -111,6 +135,23 @@ void processCommand(const std::string& command) {
     else if (command.substr(0, 4) == "call") {
         std::string toNumber = command.substr(5); // 假设命令格式为"call 8881"
         std::cout << " call to " << toNumber << std::endl;
+        //调用rtm发送呼叫信息
+        json requestData = {
+            {"action", "call"},
+            {"room", "12345678"},
+            {"data",{
+                {"virtualNum", "8880"},
+                {"video",{
+                    {"code", "H264"},
+                    {"resolution", "1920x1080"},
+                }},
+                {"audio",{
+                    {"sampleRate", "44100"},
+                    {"channels", "2"},
+                }}
+            }}
+        };
+        rtm->publish("notification", requestData.dump());
     }
     else if (command == "exit") {
         std::exit(0);
@@ -125,8 +166,9 @@ int main(int argc, char *argv[]){
     std::cout<<"hello world" << std::endl;
 
     MyRTMListener listener;
-    std::string defaultUrl = "ws://49.232.122.245:8002";
-    std::unique_ptr<RTM> rtm(new RTM("appId", "user1234567", RTMConfig(), &listener));
+    std::string defaultUrl = "ws://192.168.31.110:8002";//"ws://49.232.122.245:8002";
+    std::string userId = fmt::format("user{}", generateRandomNumber(6));
+    std::unique_ptr<RTM> rtm(new RTM("appId", userId, RTMConfig(), &listener));
     rtm->connect(defaultUrl);
 
     //just wait ws and worker thread log show before interactive
@@ -151,7 +193,7 @@ int main(int argc, char *argv[]){
     while(true){
         //std::this_thread::sleep_for(std::chrono::milliseconds(1000));
         std::getline(std::cin, input); // 读取整行输入
-        processCommand(input); // 处理输入
+        processCommand(rtm.get(), input); // 处理输入
     }
 
     rtm.reset();
