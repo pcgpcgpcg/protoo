@@ -167,7 +167,7 @@ int main(int argc, char *argv[]){
 
     MyRTMListener listener;
     std::string defaultUrl = "ws://192.168.31.110:8002";//"ws://49.232.122.245:8002";
-    std::string userId = "user123";//fmt::format("user{}", generateRandomNumber(6));
+    std::string userId = fmt::format("user{}", generateRandomNumber(6));
     std::unique_ptr<RTM> rtm(new RTM("appId", userId, RTMConfig(), &listener));
     rtm->connect(defaultUrl);
 
