@@ -117,6 +117,18 @@
             break;
 
         case LWS_CALLBACK_CLIENT_RECEIVE:
+
+            if (lws_frame_is_binary(wsi)) {
+                if (len >= 2) {  // 确保数据长度足够包含状态码
+                    unsigned char* data = (unsigned char*)in;
+                    // WebSocket状态码在关闭帧的前两个字节，使用大端序
+                    int status_code = (data[0] << 8) | data[1];
+                    if (status_code == 4000) {
+                        std::cout << "Received a close frame with status code 4000 from server." << std::endl;
+                    }
+                }
+            }
+
             if (len > 0)
             {
                 pSelf->m_receivedMsg.append((const char*)in, len);
@@ -148,22 +160,31 @@
                 // lws_write(wsi, ping + LWS_PRE, 0, LWS_WRITE_PING);
             }
             break;
+
+        case LWS_CALLBACK_WS_PEER_INITIATED_CLOSE:
+            std::cout << "websocket peer initiated close" << (in ? (char*)in : "(null)") << std::endl;
+            //closed by server
+            pSelf->m_closed = true;
+			break;
         case LWS_CALLBACK_CLIENT_CLOSED:
-            std::cout << "websocket closed" << std::endl;
+            std::cout << "websocket closed" << (in ? (char*)in : "(null)") << std::endl;
             //pSelf->m_wsClient = nullptr;
             pSelf->m_listener->onClosed();
             goto do_retry;
             break;
         case LWS_CALLBACK_CLIENT_CONNECTION_ERROR:
-            std::cout << "websocket connection error" << std::endl;
+            std::cout << "websocket connection error: " << (in ? (char*)in : "(null)")<< std::endl;
             pSelf->m_listener->onFailed();
             goto do_retry;
             break;
         case LWS_CALLBACK_WSI_DESTROY:
-            std::cout << "websocket connection destroy" << std::endl;
+            std::cout << "websocket connection destroy" << (in ? (char*)in : "(null)") << std::endl;
             // cout << "[ws Connection destruction]" << endl;
              //pSelf->m_wsClient = nullptr;
             break;
+        case LWS_CALLBACK_RAW_PROXY_SRV_CLOSE:
+            std::cout << "websocket raw proxy server close" << (in ? (char*)in : "(null)") << std::endl;
+			break;
 
         default:
             break;
